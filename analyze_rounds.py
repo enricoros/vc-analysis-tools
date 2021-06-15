@@ -6,6 +6,7 @@ import pandas as pd
 import seaborn as sns
 import tensorflow_hub as hub
 
+# 1 or more data files, exported from a CrunchBase rounds search (CSV download)
 rounds_csv_file_names = ['data/tiger-rounds-6-14-2021.csv', 'data/coatue-rounds-6-14-2021.csv']
 
 
