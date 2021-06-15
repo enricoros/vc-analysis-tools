@@ -1,4 +1,3 @@
-import heatmap as hmz
 import igraph as ig
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -6,10 +5,8 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import tensorflow_hub as hub
-import tensorflow as tf
-import tensorflow_text as text
 
-
+rounds_csv_file_names = ['data/tiger-rounds-6-9-2021.csv']
 
 # load CB transaction CSVs
 h_title = 'Title'
@@ -41,7 +38,6 @@ def load_cb_rounds_csv(csv_file_name):
     return df
 
 
-rounds_csv_file_names = ['data/tiger-rounds-6-9-2021.csv']
 df_cb = load_cb_rounds_csv(rounds_csv_file_names[0])
 
 # text embeddings for the 'industries'
@@ -49,57 +45,15 @@ print('Encoding...')
 encoder_model = hub.load("https://tfhub.dev/google/universal-sentence-encoder/4")
 
 
-def text_to_embeds(text_list):
-    text_embeddings = encoder_model(text_list)
+def text_to_embeds(model, text_list):
+    text_embeddings = model(text_list)
     correlation = np.inner(text_embeddings, text_embeddings)
     return text_embeddings, correlation
 
 
-emb_industry, corr_industry = text_to_embeds(list(df_cb[h_industry]))
-emb_taglines, corr_taglines = text_to_embeds(list(df_cb[h_desc]))
+emb_industry, corr_industry = text_to_embeds(encoder_model, list(df_cb[h_industry]))
+emb_taglines, corr_taglines = text_to_embeds(encoder_model, list(df_cb[h_desc]))
 print('...done')
-
-# Load the BERT encoder and preprocessing models
-print('Encoding 2...')
-
-
-# electra_pre = hub.load('https://tfhub.dev/tensorflow/bert_en_uncased_preprocess/3')
-# electra_model = hub.load('https://tfhub.dev/google/electra_large/2')
-#
-#
-# def text_to_embeds_electra(text_list):
-#     text_embeddings = electra_model(electra_pre(text_list), training=False)['pooled_output']
-#     correlation = np.inner(text_embeddings, text_embeddings)
-#     return text_embeddings, correlation
-#
-#
-# emb_industry_e, corr_industry_e = text_to_embeds_electra(list(df_rounds[h_industry]))
-
-def get_albert():
-    text_input = tf.keras.layers.Input(shape=(), dtype=tf.string)
-    preprocessor = hub.KerasLayer("http://tfhub.dev/tensorflow/albert_en_preprocess/3")
-    encoder_inputs = preprocessor(text_input)
-    encoder = hub.KerasLayer("https://tfhub.dev/tensorflow/albert_en_xxlarge/3", trainable=False)
-    outputs = encoder(encoder_inputs)
-    pooled_output = outputs["pooled_output"]  # [batch_size, 4096].
-    # sequence_output = outputs["sequence_output"]  # [batch_size, seq_length, 4096].
-    embedding_model = tf.keras.Model(text_input, pooled_output)
-    return embedding_model
-
-
-albert_model = get_albert()
-
-
-def text_to_embeds_albert(text_list):
-    sentences = tf.constant(text_list)
-    text_embeddings = albert_model(sentences, training=False)
-    correlation = np.inner(text_embeddings, text_embeddings)
-    return text_embeddings, correlation
-
-
-emb_ind_albert, corr_ind_albert = text_to_embeds_albert(list(df_cb[h_industry]))
-
-print('...done 2')
 
 
 # group DF by correlation
@@ -146,17 +100,8 @@ plot_correlation_sorted_df(df_cb, corr_industry, 'Tiger Global rounds 21.H1 - by
 plt.figure()
 plot_correlation_sorted_df(df_cb, corr_taglines, 'Tiger Global rounds 21.H1 - by startup taglines similarity')
 
-plt.figure()
-plot_correlation_sorted_df(df_cb, corr_ind_albert, 'Tiger Global rounds 21.H1 - by startup industry similarity - Albert')
 
-
-# plot_corr_matrix(df_ind[h_title], np.array(list(df_ind[h_ind_emb])), 90, 'Tiger Global rounds 21.H1 - by startup industry similarity')
-
-# df_desc = sort_df_by_correlation(df_rounds, desc_corr)
-# plot_corr_matrix(df_desc[h_title], np.array(list(df_desc[h_desc_emb])), 90, 'Tiger Global rounds 21.H1 - by startup name similarity')
 # subplot = plt.subplot()
-
-
 # plt.savefig('test.png')
 
 def plot_network(df, corr_matrix, layout_algo='lgl', corr_threshold=0.5):
@@ -224,28 +169,6 @@ def plot_network(df, corr_matrix, layout_algo='lgl', corr_threshold=0.5):
 
 
 plot_network(df_cb, corr_industry, 'lgl', 0.2)  # good: lgl, graphopt, dh (slowest)
-plot_network(df_cb, corr_ind_albert, 'lgl', 0.2)  # good: lgl, graphopt, dh (slowest)
+plot_network(df_cb, corr_taglines, 'lgl', 0.2)  # good: lgl, graphopt, dh (slowest)
 
 plt.show(block=True)
-
-# def plot_corr_matrix_heatmapz(labels, corr_matrix, rotation, title):
-#     plt.figure(figsize=(8, 8))
-#
-#     lx = []
-#     ly = []
-#     lc = []
-#     for j in range(corr_matrix.shape[1]):
-#         for i in range(corr_matrix.shape[0]):
-#             lx.append(i)
-#             ly.append(j)
-#             lc.append(corr_matrix[i][j])
-#
-#     hmz.heatmap(lx, ly,
-#                 color=lc, color_range=[0, 1],
-#                 palette=sns.color_palette("YlOrRd", 256),
-#                 # palette=sns.diverging_palette(20, 220, n=256),
-#                 size=lc, size_range=[0, 1], size_scale=64
-#                 # marker=marker,
-#                 # x_order=data.columns,
-#                 # y_order=data.columns[::-1],
-#                 )
