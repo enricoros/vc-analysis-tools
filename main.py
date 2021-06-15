@@ -6,7 +6,7 @@ import pandas as pd
 import seaborn as sns
 import tensorflow_hub as hub
 
-rounds_csv_file_names = ['data/tiger-rounds-6-9-2021.csv']
+rounds_csv_file_names = ['data/tiger-rounds-6-14-2021.csv', 'data/coatue-rounds-6-14-2021.csv']
 
 
 # data loader
@@ -33,8 +33,8 @@ def cb_load_csv_rounds(csv_file_name):
     df = pd.read_csv(csv_file_name)
     df = df[headers_list]
     df[header_title] = df.apply(lambda row: row[h_name] + ' (' + (str(round(row[h_raise] / 1E+06)) if not np.isnan(row[h_raise]) else '') + ' M)', axis=1)
-    print('Total invested capital in', len(df), 'transactions:', round(np.sum(df[h_raise]) / 1E+07) / 100, ' $Bn')
-    return df, header_title, header_industries
+    total_rounds_size = round(np.sum(df[h_raise]) / 1E+08) / 10
+    return df, header_title, header_industries, total_rounds_size
 
 
 # sentence similarity, using USE from TF-Hub (instead of Sentence-Transformers, for instance)
@@ -84,9 +84,9 @@ def plot_correlation_sorted_df(df, corr_matrix, df_labels_header, chart_title):
 
 
 # Plot a Network Graph using the correlation matrix as edge weights, and the investment size as node weights
-def save_network_graph(df, corr_matrix, network_png, layout_algo='lgl', corr_threshold=0.5):
+def save_network_graph(df, corr_matrix, graph_title, graph_file_name, layout_algo='lgl', corr_threshold=0.5):
     graph = nx.Graph()
-    mpl_color_map = plt.cm.get_cmap('autumn')  # summer, Wistia
+    mpl_color_map = plt.cm.get_cmap('summer')  # summer, autumn, Wistia
 
     # add nodes
     for v_idx, row in zip(range(len(df)), df.values):
@@ -146,7 +146,20 @@ def save_network_graph(df, corr_matrix, network_png, layout_algo='lgl', corr_thr
     # iGraph: create the network from NetworkX - seems stupid but it's easier
     gg = ig.Graph.from_networkx(graph)
     # layout_algo: many, but the following are the best: 'lgl', 'graphopt', 'dh' (the latter is very slow)
-    ig.plot(gg, target=network_png, layout=gg.layout(layout_algo), bbox=(1920, 1280), margin=50)
+    plot = ig.plot(gg, target=graph_file_name, layout=gg.layout(layout_algo), bbox=(1920, 1280), margin=50)
+
+    ## manual drawing of the title of the graph (not done by iGraph)
+    def overlay_text(surface, text, width):
+        import cairo
+        ctx = cairo.Context(surface)
+        ctx.set_font_size(36)
+        from igraph.drawing.text import TextDrawer
+        drawer = TextDrawer(ctx, text, halign=TextDrawer.CENTER)
+        drawer.draw_at(0, 40, width=width * 2 / 3)
+
+    overlay_text(plot.surface, graph_title, 1280)
+    plot.save()
+    plot.show()
 
 
 ### MAIN
@@ -154,22 +167,26 @@ def save_network_graph(df, corr_matrix, network_png, layout_algo='lgl', corr_thr
 # process all input files
 for file_name, file_index in zip(rounds_csv_file_names, range(len(rounds_csv_file_names))):
     # load file
-    print(f'Loading ${file_name}...')
-    df_cb, h_title, h_industries = cb_load_csv_rounds(file_name)
+    investor_name = file_name.replace('data/', '').split('-')[0].capitalize()
+    print(f'Operating on {investor_name}.\n - Loading {file_name}...')
+    df_cb, h_title, h_industries, rounds_size = cb_load_csv_rounds(file_name)
 
     # compute sentence distance from the 'industry' column
-    print('Computing industry correlation matrix...')
+    print(' - Computing industry correlation matrix...')
     emb_industry, corr_industry = text_to_embeds(list(df_cb[h_industries]))
-    print(' min:', np.min(corr_industry), ' max: ', np.max(corr_industry))
+    print('   single min:', np.max(np.min(corr_industry, axis=1)), ' max: ', np.max(corr_industry))
 
     # plot the correlation matrix
-    print('Plotting industry correlation matrix...')
-    plt.subplot()
-    plot_correlation_sorted_df(df_cb, corr_industry, h_title, 'Tiger Global rounds 21.H1 - by startup industry similarity')
+    print(' - Plotting industry correlation matrix...')
+    plt.figure()
+    plot_correlation_sorted_df(df_cb, corr_industry, h_title, f'{investor_name} rounds 21.H1 - by startup industry similarity')
     # plt.savefig('test.png')
 
-    # save a PNG file with the graph of rounds -- f'rounds_${file_index}.png'
-    print('Generating network graph of rounds, using the LGL algo')
-    save_network_graph(df_cb, corr_industry, None, 'lgl', 0.2)
+    # save a PNG file with the graph of rounds
+    print(' - Generating network graph of rounds, using the LGL algo')
+    # title_from_file = file_name.replace('data/', '').replace('rounds', '').replace('.csv', '').replace('-', ' ').capitalize()
+    network_png = f'{investor_name}.png'
+    save_network_graph(df_cb, corr_industry, f'{investor_name} - Jan 1 to Jun 14, 2021 - raise: ${rounds_size}B', network_png, 'lgl', 0.2 if file_index == 1 else 0.3)
+    print('\n')
 
 plt.show(block=True)
