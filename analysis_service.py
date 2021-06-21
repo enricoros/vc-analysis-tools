@@ -27,7 +27,7 @@ def run_app(http_host=default_http_address, http_port=default_http_port):
     app.logger.setLevel(20)
     print()
 
-    @app.route('/vc', methods=['GET'])
+    @app.route('/vc/', methods=['GET'])
     def upload_file():
         return render_template('analysis_service_upload.html')
 
