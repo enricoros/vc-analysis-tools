@@ -9,51 +9,59 @@ import csv
 import cairo
 from igraph.drawing.text import TextDrawer
 
-# 1 or more data files, exported from a CrunchBase rounds search (CSV download)
-rounds_csv_file_names = ['data/tiger-rounds-6-18-2021.csv', 'data/coatue-rounds-6-14-2021.csv']  # ['data/laas-summit-list-21-76-16-2021.csv']
-
 # uniform arrangement of the data frame
-col_title = 'Title'
-col_name = 'Name'
-col_series = 'Series'
-col_money = 'Money'
-col_industries = 'Industries'
-col_description = 'Description'
-cols_list = [col_title, col_name, col_series, col_money, col_industries, col_description]
+COL_TITLE = 'Title'
+COL_NAME = 'Name'
+COL_SERIES = 'Series'
+COL_MONEY = 'Money'
+COL_INDUSTRIES = 'Industries'
+COL_DESCRIPTION = 'Description'
+COLS_ALL = [COL_TITLE, COL_NAME, COL_SERIES, COL_MONEY, COL_INDUSTRIES, COL_DESCRIPTION]
+TSV_HEADERS = [COL_NAME, COL_TITLE, COL_SERIES, COL_MONEY, COL_DESCRIPTION, COL_INDUSTRIES]
 
 
 # data loader: df[ Title, Name, Series, Money, Industries, Description ]
-def cb_load_csv_rounds(csv_file_name, csv_type):
-    df = pd.read_csv(csv_file_name)
-    if csv_type == 'company_rounds':
+def normalize_crunchbase_df(df):
+    # type heuristics: Funding Rounds
+    if "Money Raised Currency (in USD)" in df and "Organization Industries" in df:
+        print(' * detected a Funding Rounds CSV')
         df.rename(columns={
-            "Organization Name": col_name,
-            "Funding Type": col_series,
-            "Money Raised Currency (in USD)": col_money,
-            "Organization Industries": col_industries,
-            "Organization Description": col_description,
+            "Organization Name": COL_NAME,
+            "Funding Type": COL_SERIES,
+            "Money Raised Currency (in USD)": COL_MONEY,
+            "Organization Industries": COL_INDUSTRIES,
+            "Organization Description": COL_DESCRIPTION,
         }, inplace=True)
-    elif csv_type == 'company_list':
+
+    # type heuristics: Company List
+    elif "Total Funding Amount Currency (in USD)" in df:
+        print(' * detected a Company List CSV')
         df.rename(columns={
-            "Organization Name": col_name,
+            "Organization Name": COL_NAME,
             # Series
-            "Total Funding Amount Currency (in USD)": col_money,
-            "Industries": col_industries,
-            "Description": col_description,
+            "Total Funding Amount Currency (in USD)": COL_MONEY,
+            "Industries": COL_INDUSTRIES,
+            "Description": COL_DESCRIPTION,
         }, inplace=True)
-        df[col_series] = 'Unknown'
+        df[COL_SERIES] = 'Unknown'
+
+    # type heuristics: ?
     else:
         raise Exception('Wrong CSV file type')
-    df[col_title] = df.apply(lambda row: row[col_name] + ' (' + (str(round(row[col_money] / 1E+06)) if np.isfinite(row[col_money]) else '') + ' M)', axis=1)
-    return df[cols_list]
+
+    df[COL_TITLE] = df.apply(lambda row: row[COL_NAME] + ' (' + (str(round(row[COL_MONEY] / 1E+06)) if np.isfinite(row[COL_MONEY]) else '') + ' M)', axis=1)
+    return df[COLS_ALL]
 
 
 # sentence similarity, using USE from TF-Hub (instead of Sentence-Transformers, for instance)
-use_model = hub.load("https://tfhub.dev/google/universal-sentence-encoder/4")
+_model_use = None
 
 
-def text_to_embeds_use(model, text_list):
-    text_embeddings = model(text_list)
+def text_to_embeds_use(text_list):
+    global _model_use
+    if _model_use is None:
+        _model_use = hub.load("https://tfhub.dev/google/universal-sentence-encoder/4")
+    text_embeddings = _model_use(text_list)
     correlation = np.inner(text_embeddings, text_embeddings)
     return 'use', text_embeddings.numpy(), correlation
 
@@ -174,7 +182,7 @@ def save_network_graph(df, corr_matrix, graph_title, graph_file_name, layout_alg
 
 # export array as CSV, with optional header row
 def save_numpy_as_csv(array, csv_file_name, headers=None, delimiter='\t'):
-    print(f' - saving {csv_file_name}')
+    print(f' - exported: {csv_file_name}')
     with open(csv_file_name, 'w', encoding='utf8', newline='') as tsv_file:
         writer = csv.writer(tsv_file, delimiter=delimiter, lineterminator='\n')
         if headers is not None:
@@ -184,50 +192,48 @@ def save_numpy_as_csv(array, csv_file_name, headers=None, delimiter='\t'):
 
 
 # process for an individual configuration
-def analyze_csv(file_name, nlp_column, export_only=False):
+def analyze_csv(investor_name, file_name, nlp_column, export_tsv=True, export_network_png=True, plot_corr_matrix=True):
     # load file
-    investor_name = file_name.replace('data/', '').split('-')[0].capitalize()
-    print(f'Operating on {investor_name}.\n - Loading {file_name}...')
-    df_cb = cb_load_csv_rounds(file_name, 'company_list' if 'list' in file_name else 'company_rounds')
+    print(f'\nOperating on {investor_name}.\n - Loading {file_name}...')
+    df_cb = pd.read_csv(file_name)
+    df_cb = normalize_crunchbase_df(df_cb)
     df_cb.dropna(subset=[nlp_column], inplace=True)
-
-    # # extract all col_industries
-    # all_industries = ', '.join(sum(df_cb[[col_industries]].to_numpy().tolist(), [])).split(', ')
-    # all_industries.sort()
-    # from itertools import groupby
-    # aaa = [len(list(group)) for key, group in groupby(all_industries)]
 
     # compute sentence distance from the nlp column
     print(f" - NLP analysis and correlation matrix, based off '{nlp_column}'...")
-    model_name, companies_embeds, companies_corr = text_to_embeds_use(use_model, list(df_cb[nlp_column]))
+    nlp_strings = list(df_cb[nlp_column])
+    model_name, companies_embeds, companies_corr = text_to_embeds_use(nlp_strings)
     print('   single min:', np.max(np.min(companies_corr, axis=1)), ' max: ', np.max(companies_corr))
 
     # save raw embeds for usage (for instance with https://projector.tensorflow.org/)
-    tsv_base_name = f'embeds-{nlp_column}-{model_name}-{investor_name}'
-    tsv_headers = [col_name, col_title, col_series, col_money, col_description, col_industries]
-    save_numpy_as_csv(companies_embeds, f'{tsv_base_name}.tsv')
-    save_numpy_as_csv(df_cb[tsv_headers].to_numpy(), f'{tsv_base_name}-meta.tsv', tsv_headers)
-    if export_only is True:
-        print(f' - Skipping Correlation Matrix, and Network Graph...\n')
-        return
+    if export_tsv:
+        tsv_base_name = f'embeds-{nlp_column}-{model_name}-{investor_name}'
+        save_numpy_as_csv(companies_embeds, f'{tsv_base_name}.tsv')
+        save_numpy_as_csv(df_cb[TSV_HEADERS].to_numpy(), f'{tsv_base_name}-meta.tsv', TSV_HEADERS)
 
     # plot the correlation matrix
-    print(f' - Plotting {nlp_column} correlation matrix...')
-    plt.figure()
-    plot_correlation_sorted_df(df_cb, companies_corr, col_title, f'{investor_name} rounds 21.H1 - by startup {nlp_column} similarity')
-    # plt.savefig('test.png')
+    if plot_corr_matrix:
+        print(f' - Plotting {nlp_column} correlation matrix...')
+        plt.figure()
+        plot_correlation_sorted_df(df_cb, companies_corr, COL_TITLE, f'{investor_name} rounds 21.H1 - by startup {nlp_column} similarity')
+        # plt.savefig('test.png')
+        plt.show(block=True)
 
     # save a PNG file with the graph of rounds
-    print(' - Generating network graph of rounds, using the LGL algo')
-    rounds_sum = round(np.sum(df_cb[col_money]) / 1E+08) / 10
-    graph_title = f'{investor_name} - sum of series: {rounds_sum}B'  # Jan 1 to Jun 14, 2021 -
-    png_file_name = f'graph-{investor_name}.png'
-    save_network_graph(df_cb, companies_corr, graph_title, png_file_name, 'lgl', 0.2 if 'coatue' in file_name else 0.3)
-    print('\n')
+    if export_network_png:
+        print(' - Generating network graph of rounds, using the LGL algo')
+        rounds_sum = round(np.sum(df_cb[COL_MONEY]) / 1E+08) / 10
+        graph_title = f'{investor_name} - sum of series: {rounds_sum}B'  # Jan 1 to Jun 14, 2021 -
+        png_file_name = f'graph-{investor_name}.png'
+        save_network_graph(df_cb, companies_corr, graph_title, png_file_name, 'lgl', 0.2 if 'coatue' in file_name else 0.3)
 
 
-### MAIN
-for f_name in rounds_csv_file_names:
-    analyze_csv(f_name, col_industries, True)
+# basically tests the process
+def _main():
+    for f_name in ['data/tiger-rounds-6-18-2021.csv', 'data/coatue-rounds-6-14-2021.csv']:  # ['data/laas-summit-list-21-76-16-2021.csv']
+        investor_name = f_name.replace('data/', '').split('-')[0].capitalize()
+        analyze_csv(investor_name, f_name, COL_INDUSTRIES, True, False, False)
 
-plt.show(block=True)
+
+if __name__ == '__main__':
+    _main()

@@ -1,7 +1,7 @@
 # vc-analysis-tools
 Simple data analysis tools for ventures investments.
 
-## [analyze_rounds.py](analyze_rounds.py) - NLP x Funding Rounds
+## [analyze_rounds.py](analyze.py) - NLP x Funding Rounds
 Examines funding rounds exported from CrunchBase in CSV format. Using NLP clusters the investment rounds
 by industry similarity. 
 
