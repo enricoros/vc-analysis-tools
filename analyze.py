@@ -6,8 +6,6 @@ import pandas as pd
 import seaborn as sns
 import tensorflow_hub as hub
 import csv
-import cairo
-from igraph.drawing.text import TextDrawer
 
 # uniform arrangement of the data frame
 COL_TITLE = 'Title'
@@ -170,6 +168,8 @@ def save_network_graph(df, corr_matrix, graph_title, graph_file_name, layout_alg
 
     ## manual drawing of the title of the graph (not done by iGraph)
     def overlay_text(surface, text, width):
+        import cairo
+        from igraph.drawing.text import TextDrawer
         ctx = cairo.Context(surface)
         ctx.set_font_size(36)
         drawer = TextDrawer(ctx, text, halign=TextDrawer.CENTER)
