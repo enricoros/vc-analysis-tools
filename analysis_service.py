@@ -27,11 +27,11 @@ def run_app(http_host=default_http_address, http_port=default_http_port):
     app.logger.setLevel(20)
     print()
 
-    @app.route('/', methods=['GET'])
+    @app.route('/vc', methods=['GET'])
     def upload_file():
         return render_template('analysis_service_upload.html')
 
-    @app.route('/upload_csv', methods=['POST'])
+    @app.route('/vc/upload_csv', methods=['POST'])
     def analyze_csv():
         try:
             # load the CSV file into memory
@@ -94,7 +94,7 @@ def run_app(http_host=default_http_address, http_port=default_http_port):
             traceback.print_exc()
             return {"backend_exception": repr(e)}, 500
 
-    @app.route('/download_tsv/<name>', methods=['GET'])
+    @app.route('/vc/download_tsv/<name>', methods=['GET'])
     def download_tsv(name):
         try:
             if name not in hack_in_mem_downloads:
