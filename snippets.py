@@ -8,7 +8,7 @@ import numpy as np
 import seaborn as sns
 import tensorflow_hub as hub
 import tensorflow as tf
-import tensorflow_text as text
+import tensorflow_text as text # needed to un-break Albert, even if it appears unused
 
 text_to_relate = [
     '3D Technology, Aerospace, Artificial Intelligence, Manufacturing, Supply Chain Management',
@@ -25,8 +25,8 @@ electra_model = hub.load('https://tfhub.dev/google/electra_large/2')
 
 def text_to_embeds_electra(text_list):
     text_embeddings = electra_model(electra_pre(text_list), training=False)['pooled_output']
-    correlation = np.inner(text_embeddings, text_embeddings)
-    return text_embeddings, correlation
+    correlation = tf.convert_to_tensor([tf.keras.losses.cosine_similarity(-x, text_embeddings, axis=-1) for x in text_embeddings]).numpy()
+    return 'electra', text_embeddings.numpy(), correlation
 
 
 emb_industry_e, corr_industry_e = text_to_embeds_electra(text_to_relate)
@@ -48,8 +48,8 @@ def get_albert():
 def text_to_embeds_albert(model, text_list):
     sentences = tf.constant(text_list)
     text_embeddings = model(sentences, training=False)
-    correlation = np.inner(text_embeddings, text_embeddings)
-    return text_embeddings, correlation
+    correlation = tf.convert_to_tensor([tf.keras.losses.cosine_similarity(-x, text_embeddings, axis=-1) for x in text_embeddings]).numpy()
+    return 'albert', text_embeddings.numpy(), correlation
 
 
 albert_model = get_albert()

@@ -5,47 +5,57 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import tensorflow_hub as hub
+import csv
+import cairo
+from igraph.drawing.text import TextDrawer
 
 # 1 or more data files, exported from a CrunchBase rounds search (CSV download)
-rounds_csv_file_names = ['data/tiger-rounds-6-14-2021.csv', 'data/coatue-rounds-6-14-2021.csv']
+rounds_csv_file_names = ['data/tiger-rounds-6-18-2021.csv', 'data/coatue-rounds-6-14-2021.csv']  # ['data/laas-summit-list-21-76-16-2021.csv']
+
+# uniform arrangement of the data frame
+col_title = 'Title'
+col_name = 'Name'
+col_series = 'Series'
+col_money = 'Money'
+col_industries = 'Industries'
+col_description = 'Description'
+cols_list = [col_title, col_name, col_series, col_money, col_industries, col_description]
 
 
-# data loader
-def cb_load_csv_rounds(csv_file_name):
-    header_title = 'Title'
-    header_industries = 'Organization Industries'
-    header_description = 'Organization Description'
-    h_name = 'Organization Name'
-    h_raise = 'Money Raised Currency (in USD)'
-    headers_list = [
-        'Transaction Name',
-        h_name,
-        'Organization Name URL',
-        'Funding Type',
-        h_raise,
-        'Announced Date',
-        'Investor Names',
-        'Lead Investors',
-        'Pre-Money Valuation Currency (in USD)',
-        header_industries,
-        'CB Rank (Funding Round)',
-        header_description,
-    ]
+# data loader: df[ Title, Name, Series, Money, Industries, Description ]
+def cb_load_csv_rounds(csv_file_name, csv_type):
     df = pd.read_csv(csv_file_name)
-    df = df[headers_list]
-    df[header_title] = df.apply(lambda row: row[h_name] + ' (' + (str(round(row[h_raise] / 1E+06)) if not np.isnan(row[h_raise]) else '') + ' M)', axis=1)
-    total_rounds_size = round(np.sum(df[h_raise]) / 1E+08) / 10
-    return df, header_title, header_industries, total_rounds_size
+    if csv_type == 'company_rounds':
+        df.rename(columns={
+            "Organization Name": col_name,
+            "Funding Type": col_series,
+            "Money Raised Currency (in USD)": col_money,
+            "Organization Industries": col_industries,
+            "Organization Description": col_description,
+        }, inplace=True)
+    elif csv_type == 'company_list':
+        df.rename(columns={
+            "Organization Name": col_name,
+            # Series
+            "Total Funding Amount Currency (in USD)": col_money,
+            "Industries": col_industries,
+            "Description": col_description,
+        }, inplace=True)
+        df[col_series] = 'Unknown'
+    else:
+        raise Exception('Wrong CSV file type')
+    df[col_title] = df.apply(lambda row: row[col_name] + ' (' + (str(round(row[col_money] / 1E+06)) if np.isfinite(row[col_money]) else '') + ' M)', axis=1)
+    return df[cols_list]
 
 
 # sentence similarity, using USE from TF-Hub (instead of Sentence-Transformers, for instance)
-encoder_model = hub.load("https://tfhub.dev/google/universal-sentence-encoder/4")
+use_model = hub.load("https://tfhub.dev/google/universal-sentence-encoder/4")
 
 
-def text_to_embeds(text_list):
-    text_embeddings = encoder_model(text_list)
+def text_to_embeds_use(model, text_list):
+    text_embeddings = model(text_list)
     correlation = np.inner(text_embeddings, text_embeddings)
-    return text_embeddings, correlation
+    return 'use', text_embeddings.numpy(), correlation
 
 
 # analysis from correlations matrices: group (sort rows, cols)
@@ -91,11 +101,12 @@ def save_network_graph(df, corr_matrix, graph_title, graph_file_name, layout_alg
 
     # add nodes
     for v_idx, row in zip(range(len(df)), df.values):
+        # row - array as per cols_list
         label = row[1]
 
         # style vertex by founding Stage
         frame_width = 0
-        series = row[3]
+        series = row[2]
         if 'Unknown' in series:
             frame_width = 1
             color = '#fff'
@@ -109,8 +120,8 @@ def save_network_graph(df, corr_matrix, graph_title, graph_file_name, layout_alg
             color = '#fff'
 
         # style variant: unknown raise amount
-        raised = row[4]
-        millions = round(raised / 1E+06 if not np.isnan(raised) else 0)
+        money = row[3]
+        millions = round(money / 1E+06 if not np.isnan(money) else 0)
         if millions == 0:
             millions = 200
             frame_width = 1
@@ -151,10 +162,8 @@ def save_network_graph(df, corr_matrix, graph_title, graph_file_name, layout_alg
 
     ## manual drawing of the title of the graph (not done by iGraph)
     def overlay_text(surface, text, width):
-        import cairo
         ctx = cairo.Context(surface)
         ctx.set_font_size(36)
-        from igraph.drawing.text import TextDrawer
         drawer = TextDrawer(ctx, text, halign=TextDrawer.CENTER)
         drawer.draw_at(0, 40, width=width * 2 / 3)
 
@@ -163,31 +172,62 @@ def save_network_graph(df, corr_matrix, graph_title, graph_file_name, layout_alg
     plot.show()
 
 
-### MAIN
+# export array as CSV, with optional header row
+def save_numpy_as_csv(array, csv_file_name, headers=None, delimiter='\t'):
+    print(f' - saving {csv_file_name}')
+    with open(csv_file_name, 'w', encoding='utf8', newline='') as tsv_file:
+        writer = csv.writer(tsv_file, delimiter=delimiter, lineterminator='\n')
+        if headers is not None:
+            writer.writerow(headers)
+        for f in array:
+            writer.writerow(f.tolist())
 
-# process all input files
-for file_name, file_index in zip(rounds_csv_file_names, range(len(rounds_csv_file_names))):
+
+# process for an individual configuration
+def analyze_csv(file_name, nlp_column, export_only=False):
     # load file
     investor_name = file_name.replace('data/', '').split('-')[0].capitalize()
     print(f'Operating on {investor_name}.\n - Loading {file_name}...')
-    df_cb, h_title, h_industries, rounds_size = cb_load_csv_rounds(file_name)
+    df_cb = cb_load_csv_rounds(file_name, 'company_list' if 'list' in file_name else 'company_rounds')
+    df_cb.dropna(subset=[nlp_column], inplace=True)
 
-    # compute sentence distance from the 'industry' column
-    print(' - Computing industry correlation matrix...')
-    emb_industry, corr_industry = text_to_embeds(list(df_cb[h_industries]))
-    print('   single min:', np.max(np.min(corr_industry, axis=1)), ' max: ', np.max(corr_industry))
+    # # extract all col_industries
+    # all_industries = ', '.join(sum(df_cb[[col_industries]].to_numpy().tolist(), [])).split(', ')
+    # all_industries.sort()
+    # from itertools import groupby
+    # aaa = [len(list(group)) for key, group in groupby(all_industries)]
+
+    # compute sentence distance from the nlp column
+    print(f" - NLP analysis and correlation matrix, based off '{nlp_column}'...")
+    model_name, companies_embeds, companies_corr = text_to_embeds_use(use_model, list(df_cb[nlp_column]))
+    print('   single min:', np.max(np.min(companies_corr, axis=1)), ' max: ', np.max(companies_corr))
+
+    # save raw embeds for usage (for instance with https://projector.tensorflow.org/)
+    tsv_base_name = f'embeds-{nlp_column}-{model_name}-{investor_name}'
+    tsv_headers = [col_name, col_title, col_series, col_money, col_description, col_industries]
+    save_numpy_as_csv(companies_embeds, f'{tsv_base_name}.tsv')
+    save_numpy_as_csv(df_cb[tsv_headers].to_numpy(), f'{tsv_base_name}-meta.tsv', tsv_headers)
+    if export_only is True:
+        print(f' - Skipping Correlation Matrix, and Network Graph...\n')
+        return
 
     # plot the correlation matrix
-    print(' - Plotting industry correlation matrix...')
+    print(f' - Plotting {nlp_column} correlation matrix...')
     plt.figure()
-    plot_correlation_sorted_df(df_cb, corr_industry, h_title, f'{investor_name} rounds 21.H1 - by startup industry similarity')
+    plot_correlation_sorted_df(df_cb, companies_corr, col_title, f'{investor_name} rounds 21.H1 - by startup {nlp_column} similarity')
     # plt.savefig('test.png')
 
     # save a PNG file with the graph of rounds
     print(' - Generating network graph of rounds, using the LGL algo')
-    # title_from_file = file_name.replace('data/', '').replace('rounds', '').replace('.csv', '').replace('-', ' ').capitalize()
-    network_png = f'{investor_name}.png'
-    save_network_graph(df_cb, corr_industry, f'{investor_name} - Jan 1 to Jun 14, 2021 - raise: ${rounds_size}B', network_png, 'lgl', 0.2 if file_index == 1 else 0.3)
+    rounds_sum = round(np.sum(df_cb[col_money]) / 1E+08) / 10
+    graph_title = f'{investor_name} - sum of series: {rounds_sum}B'  # Jan 1 to Jun 14, 2021 -
+    png_file_name = f'graph-{investor_name}.png'
+    save_network_graph(df_cb, companies_corr, graph_title, png_file_name, 'lgl', 0.2 if 'coatue' in file_name else 0.3)
     print('\n')
+
+
+### MAIN
+for f_name in rounds_csv_file_names:
+    analyze_csv(f_name, col_industries, True)
 
 plt.show(block=True)
