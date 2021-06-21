@@ -82,8 +82,8 @@ def run_app(http_host=default_http_address, http_port=default_http_port):
             <body>
             <div>Outputs - "save as..." the following:
             <ul>
-            <li><a href="/download_tsv/{uid1}">{uid1}</a> ({len(contents1)} bytes)</li>
-            <li><a href="/download_tsv/{uid2}">{uid2}</a> ({len(contents2)} bytes)</li>
+            <li><a href="/vc/download_tsv/{uid1}">{uid1}</a> ({len(contents1)} bytes)</li>
+            <li><a href="/vc/download_tsv/{uid2}">{uid2}</a> ({len(contents2)} bytes)</li>
             </ul>
             </body>
             </html>
