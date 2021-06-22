@@ -93,10 +93,11 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
             # HACK: shall cache-purge, but we're keeping just the last item, instead
             hack_in_mem_downloads = {embeds_uid: embeds_tsv, meta_uid: meta_tsv}
 
-            return {"files": [
-                {'name': embeds_uid, 'kind': 'embeds_tsv', 'length': len(embeds_tsv), 'shape': companies_embeds.shape},
-                {'name': meta_uid, 'kind': 'meta_tsv', 'length': len(meta_tsv), 'shape': companies_meta.shape},
-            ]}, 200
+            return {'embeds': {
+                'name': embeds_uid, 'length': len(embeds_tsv), 'shape': companies_embeds.shape,
+            }, 'meta': {
+                'name': meta_uid, 'length': len(meta_tsv), 'shape': companies_meta.shape,
+            }}, 200
 
             # return f"""<html>
             # <body>
