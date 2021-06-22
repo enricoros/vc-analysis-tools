@@ -26,7 +26,7 @@ hack_in_mem_downloads = {}
 # Flash main app
 def run_app(http_host=default_http_address, http_port=default_http_port, api_prefix=default_api_prefix):
     # configure Flask for serving
-    print(f'\n# Starting HTTP endpoint on {http_host}: {http_port}')
+    print(f'\n# Starting HTTP endpoint on {http_host}: {http_port}, api prefix: {api_prefix}')
     app = Flask(__name__)
     app.logger.setLevel(20)
     print()
