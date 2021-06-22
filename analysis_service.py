@@ -46,9 +46,9 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
         df_cb = pd.read_csv(BytesIO(csv_contents))
         df_cb = normalize_crunchbase_df(df_cb)
         # find the NLP column
-        if COL_INDUSTRIES not in df_cb:
-            raise Exception('Cannot find the "Industries" field')
         col_nlp = COL_INDUSTRIES
+        if col_nlp not in df_cb:
+            raise Exception('Cannot find the "Industries" field')
         df_cb.dropna(subset=[col_nlp], inplace=True)
 
         # perform the NLP analysis (first time it will load the model)
@@ -61,7 +61,7 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
 
         # metadata
         companies_meta = df_cb[TSV_HEADERS].to_numpy()
-        return file_base_name, companies_embeds, companies_meta
+        return file_base_name, companies_embeds, companies_meta, col_nlp
 
     # numpy array to tsv (csv) string, with optional headers
     def array_to_tsv_string(array, tsv_name, headers=None):
@@ -82,7 +82,7 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
     def analyze_csv():
         global hack_in_mem_downloads
         try:
-            file_base_name, companies_embeds, companies_meta = process_uploaded_file()
+            file_base_name, companies_embeds, companies_meta, nlp_field = process_uploaded_file()
 
             embeds_uid = f'{file_base_name}.tsv'
             embeds_tsv = array_to_tsv_string(companies_embeds, embeds_uid)
@@ -93,11 +93,8 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
             # HACK: shall cache-purge, but we're keeping just the last item, instead
             hack_in_mem_downloads = {embeds_uid: embeds_tsv, meta_uid: meta_tsv}
 
-            return {'embeds': {
-                'name': embeds_uid, 'length': len(embeds_tsv), 'shape': companies_embeds.shape,
-            }, 'meta': {
-                'name': meta_uid, 'length': len(meta_tsv), 'shape': companies_meta.shape,
-            }}, 200
+            return {'embeds': {'name': embeds_uid, 'length': len(embeds_tsv), 'shape': companies_embeds.shape, 'nlp_field': nlp_field, },
+                    'meta': {'name': meta_uid, 'length': len(meta_tsv), 'shape': companies_meta.shape, 'fields': TSV_HEADERS, }, }, 200
 
             # return f"""<html>
             # <body>
