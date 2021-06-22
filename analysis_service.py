@@ -76,7 +76,7 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
 
     @app.route(api_prefix + '/index.html', methods=['GET'])
     def upload_file():
-        return render_template('analysis_service_upload.html')
+        return render_template('analysis_service_upload.html', api_prefix=api_prefix)
 
     @app.route(api_prefix + page_upload_html_resp, methods=['POST'])
     def analyze_csv():
@@ -89,22 +89,24 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
             meta_uid = f'{file_base_name}-meta.tsv'
             meta_tsv = array_to_tsv_string(companies_meta, meta_uid, TSV_HEADERS)
 
+            # NOTE: this replaces the full contents, so former generations will not be accessible
+            # HACK: shall cache-purge, but we're keeping just the last item, instead
             hack_in_mem_downloads = {embeds_uid: embeds_tsv, meta_uid: meta_tsv}
 
-            # return {"files": [
-            #     {'name': embeds_uid, 'length': len(embeds_tsv), },
-            #     {'name': meta_uid, 'length': len(meta_tsv), },
-            # ]}, 200
+            return {"files": [
+                {'name': embeds_uid, 'kind': 'embeds_tsv', 'length': len(embeds_tsv), 'shape': companies_embeds.shape},
+                {'name': meta_uid, 'kind': 'meta_tsv', 'length': len(meta_tsv), 'shape': companies_meta.shape},
+            ]}, 200
 
-            return f"""<html>
-            <body>
-              <div>Outputs - "save as..." the following:
-              <ul>
-                <li><a href="{api_prefix}/download_tsv/{embeds_uid}">{embeds_uid}</a> ({len(embeds_tsv)} bytes)</li>
-                <li><a href="{api_prefix}/download_tsv/{meta_uid}">{meta_uid}</a> ({len(meta_tsv)} bytes)</li>
-              </ul>
-            </body>
-            </html>""", 200
+            # return f"""<html>
+            # <body>
+            #   <div>Outputs - "save as..." the following:
+            #   <ul>
+            #     <li><a href="{api_prefix}/download_tsv/{embeds_uid}">{embeds_uid}</a> ({len(embeds_tsv)} bytes)</li>
+            #     <li><a href="{api_prefix}/download_tsv/{meta_uid}">{meta_uid}</a> ({len(meta_tsv)} bytes)</li>
+            #   </ul>
+            # </body>
+            # </html>""", 200
 
         except Exception as e:
             print("EXCEPTION on analyze_csv")

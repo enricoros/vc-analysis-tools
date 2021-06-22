@@ -14,7 +14,7 @@
 <body>
 <div>
     <div>CB CSV - NLP analysis</div>
-    <form action="/vc/upload_csv" method="POST" enctype="multipart/form-data">
+    <form action="{{api_prefix}}/upload_csv" method="POST" enctype="multipart/form-data">
         <input type="file" name="file"/>
         <input type="submit"/>
     </form>
