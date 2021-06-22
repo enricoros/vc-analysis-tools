@@ -31,6 +31,9 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
     app.logger.setLevel(20)
     print()
 
+    # warm up the predictor
+    text_to_embeds_use(['House', 'Home', 'Cat'])
+
     # load the file received as attachment, produce the embeds, prepare the 2 data arrays
     def process_uploaded_file():
         # load the CSV file into memory
