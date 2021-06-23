@@ -43,6 +43,18 @@ def normalize_crunchbase_df(df):
         }, inplace=True)
         df[COL_SERIES] = 'Unknown'
 
+    # type heuristics: Company Search
+    elif "Last Funding Type" in df:
+        print(' * detected a Company Search CSV')
+        df.rename(columns={
+            "Organization Name": COL_NAME,
+            "Last Funding Type": COL_SERIES,
+            # Money
+            "Industries": COL_INDUSTRIES,
+            "Description": COL_DESCRIPTION,
+        }, inplace=True)
+        df[COL_MONEY] = 0
+
     # type heuristics: ?
     else:
         raise Exception('Wrong CSV file type')
@@ -230,7 +242,7 @@ def analyze_csv(investor_name, file_name, nlp_column, export_tsv=True, export_ne
 
 # basically tests the process
 def _main():
-    for f_name in ['data/tiger-rounds-6-18-2021.csv', 'data/coatue-rounds-6-14-2021.csv']:  # ['data/laas-summit-list-21-76-16-2021.csv']
+    for f_name in ['data/ai-companies-6-23-2021.csv', 'data/tiger-rounds-6-18-2021.csv', 'data/coatue-rounds-6-14-2021.csv']:  # ['data/laas-summit-list-21-76-16-2021.csv']
         investor_name = f_name.replace('data/', '').split('-')[0].capitalize()
         analyze_csv(investor_name, f_name, COL_INDUSTRIES, True, False, False)
 
