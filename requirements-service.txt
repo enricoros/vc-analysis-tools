@@ -1,0 +1,17 @@
+#matplotlib~=3.4.2       # heatmap and graphs (palette)
+networkx~=2.5.1         # network graphs (1/2: easy build)
+numpy
+pandas==1.2.4           # CSV load
+pycairo~=1.20.1         # network graphs: render PNGs
+python-igraph~=0.9.4    # network graphs (2/2: best layout/plot)
+seaborn==0.11.1         # heatmap
+tensorflow-cpu~=2.5.0
+tensorflow-hub~=0.12.0
+tensorflow-text
+
+# for the server part
+fire~=0.4.0
+flask~=2.0.1
+
+# for snippets
+#heatmapz~=0.0.4
