@@ -11,7 +11,7 @@ import pandas as pd
 from flask import Flask, render_template, request, send_file
 from flask_cors import cross_origin
 
-from analyze import normalize_crunchbase_df, text_to_embeds_use, TSV_HEADERS, COL_INDUSTRIES
+from analyze import normalize_crunchbase_df, text_to_embeds_use, TSV_HEADERS, COL_INDUSTRIES, COL_DESCRIPTION
 
 # configuration
 default_http_address = '127.0.0.1'
@@ -52,8 +52,16 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
         df_cb = normalize_crunchbase_df(df_cb)
         # find the NLP column
         col_nlp = COL_INDUSTRIES
+        if 'col' in request.form:
+            col_form = request.form['col']
+            if col_form == '0':
+                col_nlp = COL_INDUSTRIES
+            elif col_form == '1':
+                col_nlp = COL_DESCRIPTION
+            else:
+                print(f'EE: embedding columns requested ({col_form}) is not supported. Fallback to using: {col_nlp}')
         if col_nlp not in df_cb:
-            raise Exception('Cannot find the "Industries" field')
+            raise Exception(f'Cannot find the "{col_nlp}" field')
         df_cb.dropna(subset=[col_nlp], inplace=True)
 
         # perform the NLP analysis (first time it will load the model)
