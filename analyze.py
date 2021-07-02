@@ -1,11 +1,6 @@
-import igraph as ig
-import matplotlib.pyplot as plt
-import networkx as nx
 import numpy as np
 import pandas as pd
-import seaborn as sns
 import tensorflow_hub as hub
-import csv
 
 # uniform arrangement of the data frame
 COL_TITLE = 'Title'
@@ -94,6 +89,7 @@ def plot_correlation_sorted_df(df, corr_matrix, df_labels_header, chart_title):
         return _df.reindex(index=sorted_i), _corr_matrix[sorted_i, :][:, sorted_i]
 
     def plot_corr_matrix_sns(_corr_matrix, labels, _title):
+        import seaborn as sns
         # mask = np.zeros_like(corr)
         # mask[np.triu_indices_from(mask)] = True
         sns.set(font_scale=1.0)
@@ -114,6 +110,9 @@ def plot_correlation_sorted_df(df, corr_matrix, df_labels_header, chart_title):
 
 # Plot a Network Graph using the correlation matrix as edge weights, and the investment size as node weights
 def save_network_graph(df, corr_matrix, graph_title, graph_file_name, layout_algo='lgl', corr_threshold=0.5):
+    import igraph as ig
+    import matplotlib.pyplot as plt
+    import networkx as nx
     graph = nx.Graph()
     mpl_color_map = plt.cm.get_cmap('summer')  # summer, autumn, Wistia
 
@@ -194,6 +193,7 @@ def save_network_graph(df, corr_matrix, graph_title, graph_file_name, layout_alg
 
 # export array as CSV, with optional header row
 def save_numpy_as_csv(array, csv_file_name, headers=None, delimiter='\t'):
+    import csv
     print(f' - exported: {csv_file_name}')
     with open(csv_file_name, 'w', encoding='utf8', newline='') as tsv_file:
         writer = csv.writer(tsv_file, delimiter=delimiter, lineterminator='\n')
@@ -225,6 +225,7 @@ def analyze_csv(investor_name, file_name, nlp_column, export_tsv=True, export_ne
 
     # plot the correlation matrix
     if plot_corr_matrix:
+        import matplotlib.pyplot as plt
         print(f' - Plotting {nlp_column} correlation matrix...')
         plt.figure()
         plot_correlation_sorted_df(df_cb, companies_corr, COL_TITLE, f'{investor_name} rounds 21.H1 - by startup {nlp_column} similarity')
