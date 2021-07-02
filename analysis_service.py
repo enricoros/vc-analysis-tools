@@ -2,6 +2,7 @@
 Enrico 2021 - NLP sentence-embeddings service, exposed as REST endpoint
 """
 import csv
+import json
 import traceback
 from io import BytesIO, StringIO
 
@@ -17,7 +18,7 @@ default_http_port = 1900
 default_api_prefix = '/embeds'
 
 page_upload_html_resp = '/upload_csv'
-page_download = '/download_tsv/<name>'
+page_download = '/download'
 
 # In-Mem-Downloads - FIXME: have some purge strategy, this is just a mega-leaker
 hack_in_mem_downloads = {}
@@ -91,20 +92,39 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
             embeds_tsv = array_to_tsv_string(companies_embeds, embeds_uid)
             meta_uid = f'{file_base_name}-meta.tsv'
             meta_tsv = array_to_tsv_string(companies_meta, meta_uid, TSV_HEADERS)
+            config_uid = f'{file_base_name}-config.json'
+            config_obj = {
+                "embeddings": [
+                    {
+                        "tensorName": "My Analysis",
+                        "tensorShape": [
+                            companies_embeds.shape[0],  # 12 companies
+                            companies_embeds.shape[1],  # 512 embeds
+                        ],
+                        "tensorPath": f'https://www.enrico.ai{api_prefix}{page_download}/{embeds_uid}',
+                        "metadataPath": f'https://www.enrico.ai{api_prefix}{page_download}/{meta_uid}',
+                    }
+                ]
+            }
 
             # NOTE: this replaces the full contents, so former generations will not be accessible
             # HACK: shall cache-purge, but we're keeping just the last item, instead
-            hack_in_mem_downloads = {embeds_uid: embeds_tsv, meta_uid: meta_tsv}
+            hack_in_mem_downloads = {
+                embeds_uid: embeds_tsv,
+                meta_uid: meta_tsv,
+                config_uid: json.dumps(config_obj)
+            }
 
-            return {'embeds': {'name': embeds_uid, 'length': len(embeds_tsv), 'shape': companies_embeds.shape, 'nlp_field': nlp_field, },
-                    'meta': {'name': meta_uid, 'length': len(meta_tsv), 'shape': companies_meta.shape, 'fields': TSV_HEADERS, }, }, 200
+            return {'embeds': {'name': embeds_uid, 'length': len(embeds_tsv), 'shape': companies_embeds.shape, 'nlp_field': nlp_field},
+                    'meta': {'name': meta_uid, 'length': len(meta_tsv), 'shape': companies_meta.shape, 'fields': TSV_HEADERS},
+                    'config': {'name': config_uid}}, 200
 
             # return f"""<html>
             # <body>
             #   <div>Outputs - "save as..." the following:
             #   <ul>
-            #     <li><a href="{api_prefix}/download_tsv/{embeds_uid}">{embeds_uid}</a> ({len(embeds_tsv)} bytes)</li>
-            #     <li><a href="{api_prefix}/download_tsv/{meta_uid}">{meta_uid}</a> ({len(meta_tsv)} bytes)</li>
+            #     <li><a href="{api_prefix}/download/{embeds_uid}">{embeds_uid}</a> ({len(embeds_tsv)} bytes)</li>
+            #     <li><a href="{api_prefix}/download/{meta_uid}">{meta_uid}</a> ({len(meta_tsv)} bytes)</li>
             #   </ul>
             # </body>
             # </html>""", 200
@@ -114,8 +134,8 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
             traceback.print_exc()
             return {"backend_exception": repr(e)}, 500
 
-    @app.route(api_prefix + page_download, methods=['GET'])
-    def download_tsv(name):
+    @app.route(api_prefix + page_download + '/<name>', methods=['GET'])
+    def download_from_cache(name):
         try:
             if name not in hack_in_mem_downloads:
                 raise Exception('File Unknown')
@@ -129,7 +149,7 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
             return send_file(buffer, as_attachment=True, attachment_filename=name, mimetype='text/csv')
 
         except Exception as e:
-            print("EXCEPTION on download_tsv")
+            print("EXCEPTION on download")
             traceback.print_exc()
             return {"backend_exception": repr(e)}, 500
 
