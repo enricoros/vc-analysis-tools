@@ -149,7 +149,7 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
             buffer = BytesIO()
             buffer.write(contents.encode())
             buffer.seek(0)
-            return send_file(buffer, as_attachment=True, attachment_filename=name, mimetype='text/csv')
+            return send_file(buffer, as_attachment=True, download_name=name, mimetype='text/csv')
 
         except Exception as e:
             print("EXCEPTION on download")

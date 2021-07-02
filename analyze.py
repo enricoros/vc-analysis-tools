@@ -6,11 +6,12 @@ import tensorflow_hub as hub
 COL_TITLE = 'Title'
 COL_NAME = 'Name'
 COL_SERIES = 'Series'
+COL_FUND_DATE = 'Funding Date'
 COL_MONEY = 'Money'
 COL_INDUSTRIES = 'Industries'
 COL_DESCRIPTION = 'Description'
-COLS_ALL = [COL_TITLE, COL_NAME, COL_SERIES, COL_MONEY, COL_INDUSTRIES, COL_DESCRIPTION]
-TSV_HEADERS = [COL_NAME, COL_TITLE, COL_SERIES, COL_MONEY, COL_DESCRIPTION, COL_INDUSTRIES]
+COLS_ALL = [COL_TITLE, COL_NAME, COL_SERIES, COL_FUND_DATE, COL_MONEY, COL_INDUSTRIES, COL_DESCRIPTION]
+TSV_HEADERS = [COL_NAME, COL_TITLE, COL_SERIES, COL_FUND_DATE, COL_MONEY, COL_DESCRIPTION, COL_INDUSTRIES]
 
 
 # data loader: df[ Title, Name, Series, Money, Industries, Description ]
@@ -21,6 +22,7 @@ def normalize_crunchbase_df(df):
         df.rename(columns={
             "Organization Name": COL_NAME,
             "Funding Type": COL_SERIES,
+            "Announced Date": COL_FUND_DATE,
             "Money Raised Currency (in USD)": COL_MONEY,
             "Organization Industries": COL_INDUSTRIES,
             "Organization Description": COL_DESCRIPTION,
@@ -32,11 +34,13 @@ def normalize_crunchbase_df(df):
         df.rename(columns={
             "Organization Name": COL_NAME,
             # Series
+            # Funding Date
             "Total Funding Amount Currency (in USD)": COL_MONEY,
             "Industries": COL_INDUSTRIES,
             "Description": COL_DESCRIPTION,
         }, inplace=True)
         df[COL_SERIES] = 'Unknown'
+        df[COL_FUND_DATE] = 'Unknown'
 
     # type heuristics: Company Search
     elif "Last Funding Type" in df:
@@ -44,6 +48,7 @@ def normalize_crunchbase_df(df):
         df.rename(columns={
             "Organization Name": COL_NAME,
             "Last Funding Type": COL_SERIES,
+            "Last Funding Date": COL_FUND_DATE,
             # Money
             "Industries": COL_INDUSTRIES,
             "Description": COL_DESCRIPTION,
