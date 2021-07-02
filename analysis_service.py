@@ -84,6 +84,7 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
         return render_template('analysis_service_upload.html', api_prefix=api_prefix)
 
     @app.route(api_prefix + page_upload_html_resp, methods=['POST'])
+    @cross_origin()
     def analyze_csv():
         global hack_in_mem_downloads
         try:
