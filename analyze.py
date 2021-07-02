@@ -6,12 +6,13 @@ import tensorflow_hub as hub
 COL_TITLE = 'Title'
 COL_NAME = 'Name'
 COL_SERIES = 'Series'
-COL_FUND_DATE = 'Funding Date'
+COL_FUND_DATE = 'Funds Date'
+COL_FUND_YEAR = 'Funds Year'
 COL_MONEY = 'Money'
 COL_INDUSTRIES = 'Industries'
 COL_DESCRIPTION = 'Description'
-COLS_ALL = [COL_TITLE, COL_NAME, COL_SERIES, COL_FUND_DATE, COL_MONEY, COL_INDUSTRIES, COL_DESCRIPTION]
-TSV_HEADERS = [COL_NAME, COL_TITLE, COL_SERIES, COL_FUND_DATE, COL_MONEY, COL_DESCRIPTION, COL_INDUSTRIES]
+COLS_ALL = [COL_TITLE, COL_NAME, COL_SERIES, COL_FUND_DATE, COL_FUND_YEAR, COL_MONEY, COL_INDUSTRIES, COL_DESCRIPTION]
+TSV_HEADERS = [COL_NAME, COL_TITLE, COL_SERIES, COL_FUND_DATE, COL_FUND_YEAR, COL_MONEY, COL_DESCRIPTION, COL_INDUSTRIES]
 
 
 # data loader: df[ Title, Name, Series, Money, Industries, Description ]
@@ -60,6 +61,7 @@ def normalize_crunchbase_df(df):
         raise Exception('Wrong CSV file type')
 
     df[COL_TITLE] = df.apply(lambda row: row[COL_NAME] + ' (' + (str(round(row[COL_MONEY] / 1E+06)) if np.isfinite(row[COL_MONEY]) else '') + ' M)', axis=1)
+    df[COL_FUND_YEAR] = df.apply(lambda row: row[COL_FUND_DATE][:4] if row[COL_FUND_DATE] != 'Unknown' else '', axis=1)
     return df[COLS_ALL]
 
 
