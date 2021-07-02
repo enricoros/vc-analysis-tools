@@ -71,10 +71,11 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
         # export as TSV
         investor_name = csv_name.replace('data/', '').split('-')[0].capitalize()
         file_base_name = f'embeds-{col_nlp}-{model_name}-{investor_name}'
+        analysis_title_name = f'{investor_name}-{col_nlp} ({model_name})'
 
         # metadata
         companies_meta = df_cb[TSV_HEADERS].to_numpy()
-        return file_base_name, companies_embeds, companies_meta, col_nlp
+        return file_base_name, analysis_title_name, companies_embeds, companies_meta, col_nlp
 
     # numpy array to tsv (csv) string, with optional headers
     def array_to_tsv_string(array, tsv_name, headers=None):
@@ -96,7 +97,7 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
     def analyze_csv():
         global hack_in_mem_downloads
         try:
-            file_base_name, companies_embeds, companies_meta, nlp_field = process_uploaded_file()
+            file_base_name, analysis_title_name, companies_embeds, companies_meta, nlp_field = process_uploaded_file()
 
             embeds_uid = f'{file_base_name}.tsv'
             embeds_tsv = array_to_tsv_string(companies_embeds, embeds_uid)
@@ -106,7 +107,7 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
             config_obj = {
                 "embeddings": [
                     {
-                        "tensorName": "My Analysis",
+                        "tensorName": analysis_title_name + ' Analysis',
                         "tensorShape": [
                             companies_embeds.shape[0],  # 12 companies
                             companies_embeds.shape[1],  # 512 embeds
