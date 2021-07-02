@@ -9,6 +9,7 @@ from io import BytesIO, StringIO
 import fire as fire
 import pandas as pd
 from flask import Flask, render_template, request, send_file
+from flask_cors import cross_origin
 
 from analyze import normalize_crunchbase_df, text_to_embeds_use, TSV_HEADERS, COL_INDUSTRIES
 
@@ -135,6 +136,7 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
             return {"backend_exception": repr(e)}, 500
 
     @app.route(api_prefix + page_download + '/<name>', methods=['GET'])
+    @cross_origin()
     def download_from_cache(name):
         try:
             if name not in hack_in_mem_downloads:
