@@ -58,6 +58,9 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
                 col_nlp = COL_INDUSTRIES
             elif col_form == '1':
                 col_nlp = COL_DESCRIPTION
+            elif col_form == '2':
+                col_nlp = 'ind_and_desc'
+                df_cb['ind_and_desc'] = df_cb.apply(lambda row: row[COL_INDUSTRIES] + '. ' + row[COL_DESCRIPTION], axis=1)
             else:
                 print(f'EE: embedding columns requested ({col_form}) is not supported. Fallback to using: {col_nlp}')
         if col_nlp not in df_cb:
