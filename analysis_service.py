@@ -11,7 +11,7 @@ import pandas as pd
 from flask import Flask, render_template, request, send_file
 from flask_cors import cross_origin
 
-from analyze import normalize_crunchbase_df, text_to_embeds_use, TSV_HEADERS, COL_INDUSTRIES, COL_DESCRIPTION
+from analyze import normalize_crunchbase_df, text_to_embeds_use_fast, text_to_embeds_use, TSV_HEADERS, COL_INDUSTRIES, COL_DESCRIPTION
 
 # configuration
 default_http_address = '127.0.0.1'
@@ -53,14 +53,17 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
         # find the NLP column
         col_nlp = COL_INDUSTRIES
         if 'col' in request.form:
-            col_form = request.form['col']
-            if col_form == '0':
+            col_form = int(request.form['col'])
+            if col_form == 0:
                 col_nlp = COL_INDUSTRIES
-            elif col_form == '1':
+            elif col_form == 1:
                 col_nlp = COL_DESCRIPTION
-            elif col_form == '2':
-                col_nlp = 'ind_and_desc'
-                df_cb['ind_and_desc'] = df_cb.apply(lambda row: row[COL_INDUSTRIES] + '. ' + row[COL_DESCRIPTION], axis=1)
+            elif col_form == 2:
+                col_nlp = 'Ind + Desc'
+                df_cb[col_nlp] = 'Industries: ' + df_cb[COL_INDUSTRIES] + '. Description: ' + df_cb[COL_DESCRIPTION]
+            elif col_form == 3:
+                col_nlp = 'Ind+Desc'
+                df_cb[col_nlp] = df_cb[COL_INDUSTRIES] + '. ' + df_cb[COL_DESCRIPTION]
             else:
                 print(f'EE: embedding columns requested ({col_form}) is not supported. Fallback to using: {col_nlp}')
         if col_nlp not in df_cb:
@@ -68,8 +71,17 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
         df_cb.dropna(subset=[col_nlp], inplace=True)
 
         # perform the NLP analysis (first time it will load the model)
+        model_fun = text_to_embeds_use
+        if 'model' in request.form:
+            model_form = int(request.form['model'])
+            if model_form == 0:
+                model_fun = text_to_embeds_use
+            elif model_form == 1:
+                model_fun = text_to_embeds_use_fast
+            else:
+                print(f'EE: model requested ({model_form}) is not supported. Fallback to using: {model_fun}')
         nlp_strings = list(df_cb[col_nlp])
-        model_name, companies_embeds, companies_corr = text_to_embeds_use(nlp_strings)
+        model_name, companies_embeds, companies_corr = model_fun(nlp_strings)
 
         # export as TSV
         investor_name = csv_name.replace('data/', '').split('-')[0].capitalize()
