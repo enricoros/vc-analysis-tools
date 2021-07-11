@@ -135,11 +135,15 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
 
             # NOTE: this replaces the full contents, so former generations will not be accessible
             # HACK: shall cache-purge, but we're keeping just the last item, instead
-            hack_in_mem_downloads = {
-                embeds_uid: embeds_tsv,
-                meta_uid: meta_tsv,
-                config_uid: json.dumps(config_obj)
-            }
+            # hack_in_mem_downloads = {
+            #     embeds_uid: embeds_tsv,
+            #     meta_uid: meta_tsv,
+            #     config_uid: json.dumps(config_obj)
+            # }
+            # NOTE: keep in-memory - FIXME: needs some eviction policy/algo
+            hack_in_mem_downloads[embeds_uid] = embeds_tsv,
+            hack_in_mem_downloads[meta_uid] = meta_tsv,
+            hack_in_mem_downloads[config_uid] = config_obj,
 
             return {'embeds': {'name': embeds_uid, 'length': len(embeds_tsv), 'shape': companies_embeds.shape, 'nlp_field': nlp_field},
                     'meta': {'name': meta_uid, 'length': len(meta_tsv), 'shape': companies_meta.shape, 'fields': TSV_HEADERS},
