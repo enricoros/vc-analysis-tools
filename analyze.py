@@ -44,7 +44,10 @@ def normalize_crunchbase_df(df):
             df.rename(columns={"Last Funding Type": COL_SERIES}, inplace=True)
         else:
             df[COL_SERIES] = 'Unknown'
-        df[COL_FUND_DATE] = 'Unknown'
+        if 'Last Funding Date' in df:
+            df.rename(columns={"Last Funding Date": COL_FUND_DATE}, inplace=True)
+        else:
+            df[COL_FUND_DATE] = 'Unknown'
 
     # type heuristics: Company Search
     elif "Last Funding Type" in df:
@@ -64,7 +67,7 @@ def normalize_crunchbase_df(df):
         raise Exception('Wrong CSV file type')
 
     df[COL_TITLE] = df.apply(lambda row: row[COL_NAME] + ' (' + (str(round(row[COL_MONEY] / 1E+06)) if np.isfinite(row[COL_MONEY]) else '') + ' M)', axis=1)
-    df[COL_FUND_YEAR] = df.apply(lambda row: row[COL_FUND_DATE][:4] if row[COL_FUND_DATE] != 'Unknown' else '', axis=1)
+    df[COL_FUND_YEAR] = df.apply(lambda row: row[COL_FUND_DATE][:4] if row[COL_FUND_DATE] != 'Unknown' and row[COL_FUND_DATE] == row[COL_FUND_DATE] else '', axis=1)
     if COL_WEBSITE in df:
         TSV_HEADERS.append(COL_WEBSITE)
     return df[TSV_HEADERS]
@@ -265,8 +268,8 @@ def analyze_csv(investor_name, file_name, nlp_column, export_tsv=True, export_ne
 
 # basically tests the process
 def _main():
-    for f_name in ['data/ai-companies-6-23-2021.csv', 'data/tiger-rounds-6-18-2021.csv', 'data/coatue-rounds-6-14-2021.csv']:  # ['data/laas-summit-list-21-76-16-2021.csv']
-        investor_name = f_name.replace('data/', '').split('-')[0].capitalize()
+    for f_name in ['examples/last-mile-7-10-2021.csv', 'data/ai-companies-6-23-2021.csv', 'data/tiger-rounds-6-18-2021.csv', 'data/coatue-rounds-6-14-2021.csv']:  # ['data/laas-summit-list-21-76-16-2021.csv']
+        investor_name = f_name.replace('data/', '').replace('examples/', '').split('-')[0].capitalize()
         analyze_csv(investor_name, f_name, COL_INDUSTRIES, True, False, False)
 
 
