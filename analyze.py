@@ -11,7 +11,7 @@ COL_FUND_YEAR = 'Funds Year'
 COL_MONEY = 'Money'
 COL_INDUSTRIES = 'Industries'
 COL_DESCRIPTION = 'Description'
-COLS_ALL = [COL_TITLE, COL_NAME, COL_SERIES, COL_FUND_DATE, COL_FUND_YEAR, COL_MONEY, COL_INDUSTRIES, COL_DESCRIPTION]
+COL_WEBSITE = 'Website'
 TSV_HEADERS = [COL_NAME, COL_TITLE, COL_SERIES, COL_FUND_DATE, COL_FUND_YEAR, COL_MONEY, COL_DESCRIPTION, COL_INDUSTRIES]
 
 
@@ -40,7 +40,10 @@ def normalize_crunchbase_df(df):
             "Industries": COL_INDUSTRIES,
             "Description": COL_DESCRIPTION,
         }, inplace=True)
-        df[COL_SERIES] = 'Unknown'
+        if 'Last Funding Type' in df:
+            df.rename(columns={"Last Funding Type": COL_SERIES}, inplace=True)
+        else:
+            df[COL_SERIES] = 'Unknown'
         df[COL_FUND_DATE] = 'Unknown'
 
     # type heuristics: Company Search
@@ -62,7 +65,9 @@ def normalize_crunchbase_df(df):
 
     df[COL_TITLE] = df.apply(lambda row: row[COL_NAME] + ' (' + (str(round(row[COL_MONEY] / 1E+06)) if np.isfinite(row[COL_MONEY]) else '') + ' M)', axis=1)
     df[COL_FUND_YEAR] = df.apply(lambda row: row[COL_FUND_DATE][:4] if row[COL_FUND_DATE] != 'Unknown' else '', axis=1)
-    return df[COLS_ALL]
+    if COL_WEBSITE in df:
+        TSV_HEADERS.append(COL_WEBSITE)
+    return df[TSV_HEADERS]
 
 
 # sentence similarity, using USE from TF-Hub (instead of Sentence-Transformers, for instance)
