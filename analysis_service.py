@@ -7,6 +7,7 @@ import traceback
 from io import BytesIO, StringIO
 
 import fire as fire
+import numpy
 import pandas as pd
 from flask import Flask, render_template, request, send_file
 from flask_cors import cross_origin
@@ -50,27 +51,30 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
         # Normalized DataFrame from the CSV
         df_cb = pd.read_csv(BytesIO(csv_contents))
         df_cb = normalize_crunchbase_df(df_cb)
-        # find the NLP column
-        col_nlp = COL_INDUSTRIES
+
+        # select the nlp column set (dynamic)
+        nlp_cols = [COL_INDUSTRIES]
         if 'col' in request.form:
             col_form = int(request.form['col'])
             if col_form == 0:
-                col_nlp = COL_INDUSTRIES
+                nlp_cols = [COL_INDUSTRIES]
             elif col_form == 1:
-                col_nlp = COL_DESCRIPTION
+                nlp_cols = [COL_DESCRIPTION]
             elif col_form == 2:
-                col_nlp = 'Ind + Desc'
-                df_cb[col_nlp] = 'Industries: ' + df_cb[COL_INDUSTRIES] + '. Description: ' + df_cb[COL_DESCRIPTION]
+                nlp_cols = [COL_INDUSTRIES, COL_DESCRIPTION]
             elif col_form == 3:
-                col_nlp = 'Ind+Desc'
-                df_cb[col_nlp] = df_cb[COL_INDUSTRIES] + '. ' + df_cb[COL_DESCRIPTION]
+                nlp_cols = ['Ind + Desc']
+                df_cb['Ind + Desc'] = 'Industries: ' + df_cb[COL_INDUSTRIES] + '. Description: ' + df_cb[COL_DESCRIPTION]
             else:
-                print(f'EE: embedding columns requested ({col_form}) is not supported. Fallback to using: {col_nlp}')
-        if col_nlp not in df_cb:
-            raise Exception(f'Cannot find the "{col_nlp}" field')
-        df_cb.dropna(subset=[col_nlp], inplace=True)
+                print(f'EE: embedding columns requested ({col_form}) is not supported. Using default.')
+        if len(nlp_cols) < 1:
+            raise Exception(f'Unspecified NLP columns')
+        for col in nlp_cols:
+            if col not in df_cb:
+                raise Exception(f'Cannot find the "{col}" field in the data set.')
+            df_cb.dropna(subset=[col], inplace=True)
 
-        # perform the NLP analysis (first time it will load the model)
+        # select the model (dynamic)
         model_fun = text_to_embeds_use
         if 'model' in request.form:
             model_form = int(request.form['model'])
@@ -80,17 +84,27 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
                 model_fun = text_to_embeds_use_fast
             else:
                 print(f'EE: model requested ({model_form}) is not supported. Fallback to using: {model_fun}')
-        nlp_strings = list(df_cb[col_nlp])
-        model_name, companies_embeds, companies_corr = model_fun(nlp_strings)
+
+        # perform the NLP analysis, concatenating all the embeds in the provided columns
+        model_name = None
+        companies_embeds = None
+        for col in nlp_cols:
+            nlp_strings = list(df_cb[col])
+            model_name, col_embeds, _ = model_fun(nlp_strings)
+            if companies_embeds is None:
+                companies_embeds = col_embeds
+            else:
+                companies_embeds = numpy.concatenate((companies_embeds, col_embeds), axis=1)
 
         # export as TSV
+        nlp_fields = "-".join(nlp_cols)
         investor_name = csv_name.replace('data/', '').split('-')[0].capitalize()
-        file_base_name = f'embeds-{col_nlp}-{model_name}-{investor_name}'
-        analysis_title_name = f'{investor_name}-{col_nlp} ({model_name})'
+        file_base_name = f'embeds-{nlp_fields}-{model_name}-{investor_name}'
+        analysis_title_name = f'{investor_name}-{nlp_fields} ({model_name})'
 
         # metadata
         companies_meta = df_cb[TSV_HEADERS].to_numpy()
-        return file_base_name, analysis_title_name, companies_embeds, companies_meta, col_nlp
+        return file_base_name, analysis_title_name, companies_embeds, companies_meta, nlp_fields
 
     # numpy array to tsv (csv) string, with optional headers
     def array_to_tsv_string(array, tsv_name, headers=None):
