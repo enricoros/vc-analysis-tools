@@ -14,5 +14,11 @@ fire~=0.4.0
 flask~=2.0.1
 flask-cors~=3.0.10
 
+# for the download-logos
+beautifulsoup4~=4.9.3
+cloudinary~=1.26.0
+python-magic-bin~=0.4.14
+requests~=2.26.0
+
 # for snippets
 #heatmapz~=0.0.4
