@@ -12,7 +12,7 @@ import pandas as pd
 from flask import Flask, render_template, request, send_file
 from flask_cors import cross_origin
 
-from analyze import normalize_crunchbase_df, text_to_embeds_use_fast, text_to_embeds_use, TSV_HEADERS, COL_INDUSTRIES, COL_DESCRIPTION
+from analyze import normalize_crunchbase_df, text_to_embeds_use_fast, text_to_embeds_use, COL_INDUSTRIES, COL_DESCRIPTION
 
 # configuration
 default_http_address = '127.0.0.1'
@@ -50,7 +50,7 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
 
         # Normalized DataFrame from the CSV
         df_cb = pd.read_csv(BytesIO(csv_contents))
-        df_cb = normalize_crunchbase_df(df_cb)
+        df_cb, df_headers = normalize_crunchbase_df(df_cb)
 
         # select the nlp column set (dynamic)
         nlp_cols = [COL_INDUSTRIES]
@@ -103,8 +103,8 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
         analysis_title_name = f'{investor_name}-{nlp_fields} ({model_name})'
 
         # metadata
-        companies_meta = df_cb[TSV_HEADERS].to_numpy()
-        return file_base_name, analysis_title_name, companies_embeds, companies_meta, nlp_fields
+        companies_meta = df_cb[df_headers].to_numpy()
+        return file_base_name, analysis_title_name, companies_embeds, companies_meta, df_headers, nlp_fields
 
     # numpy array to tsv (csv) string, with optional headers
     def array_to_tsv_string(array, tsv_name, headers=None):
@@ -126,12 +126,12 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
     def analyze_csv():
         global hack_in_mem_downloads
         try:
-            file_base_name, analysis_title_name, companies_embeds, companies_meta, nlp_field = process_uploaded_file()
+            file_base_name, analysis_title_name, companies_embeds, companies_meta, meta_headers, nlp_field = process_uploaded_file()
 
             embeds_uid = f'{file_base_name}.tsv'
             embeds_tsv = array_to_tsv_string(companies_embeds, embeds_uid)
             meta_uid = f'{file_base_name}-meta.tsv'
-            meta_tsv = array_to_tsv_string(companies_meta, meta_uid, TSV_HEADERS)
+            meta_tsv = array_to_tsv_string(companies_meta, meta_uid, meta_headers)
             config_uid = f'{file_base_name}-config.json'
             config_obj = {
                 "embeddings": [
@@ -160,7 +160,7 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
             hack_in_mem_downloads[config_uid] = json.dumps(config_obj)
 
             return {'embeds': {'name': embeds_uid, 'length': len(embeds_tsv), 'shape': companies_embeds.shape, 'nlp_field': nlp_field},
-                    'meta': {'name': meta_uid, 'length': len(meta_tsv), 'shape': companies_meta.shape, 'fields': TSV_HEADERS},
+                    'meta': {'name': meta_uid, 'length': len(meta_tsv), 'shape': companies_meta.shape, 'fields': meta_headers},
                     'config': {'name': config_uid}}, 200
 
             # return f"""<html>

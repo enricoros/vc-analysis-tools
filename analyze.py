@@ -11,8 +11,8 @@ COL_FUND_YEAR = 'Funds Year'
 COL_MONEY = 'Money'
 COL_INDUSTRIES = 'Industries'
 COL_DESCRIPTION = 'Description'
-COL_WEBSITE = 'Website'
-TSV_HEADERS = [COL_NAME, COL_TITLE, COL_SERIES, COL_FUND_DATE, COL_FUND_YEAR, COL_MONEY, COL_DESCRIPTION, COL_INDUSTRIES]
+_TSV_HEADERS = [COL_NAME, COL_TITLE, COL_SERIES, COL_FUND_DATE, COL_FUND_YEAR, COL_MONEY, COL_DESCRIPTION, COL_INDUSTRIES]
+_TSV_OPTIONALS = ['Website']
 
 
 # data loader: df[ Title, Name, Series, Money, Industries, Description ]
@@ -68,9 +68,13 @@ def normalize_crunchbase_df(df):
 
     df[COL_TITLE] = df.apply(lambda row: row[COL_NAME] + ((' (' + str(round(row[COL_MONEY] / 1E+06)) + ' M)') if np.isfinite(row[COL_MONEY]) else ''), axis=1)
     df[COL_FUND_YEAR] = df.apply(lambda row: row[COL_FUND_DATE][:4] if row[COL_FUND_DATE] != 'Unknown' and row[COL_FUND_DATE] == row[COL_FUND_DATE] else '', axis=1)
-    if COL_WEBSITE in df and COL_WEBSITE not in TSV_HEADERS:
-        TSV_HEADERS.append(COL_WEBSITE)
-    return df[TSV_HEADERS]
+
+    # add optional columns, if present in the dataset
+    headers = _TSV_HEADERS.copy()
+    for col in _TSV_OPTIONALS:
+        if col in df and col not in headers:
+            headers.append(col)
+    return df[headers], headers
 
 
 # sentence similarity, using USE from TF-Hub (instead of Sentence-Transformers, for instance)
@@ -233,7 +237,7 @@ def analyze_csv(investor_name, file_name, nlp_column, export_tsv=True, export_ne
     # load file
     print(f'\nOperating on {investor_name}.\n - Loading {file_name}...')
     df_cb = pd.read_csv(file_name)
-    df_cb = normalize_crunchbase_df(df_cb)
+    df_cb, df_headers = normalize_crunchbase_df(df_cb)
     df_cb.dropna(subset=[nlp_column], inplace=True)
 
     # compute sentence distance from the nlp column
@@ -246,7 +250,7 @@ def analyze_csv(investor_name, file_name, nlp_column, export_tsv=True, export_ne
     if export_tsv:
         tsv_base_name = f'embeds-{nlp_column}-{model_name}-{investor_name}'
         save_numpy_as_csv(companies_embeds, f'{tsv_base_name}.tsv')
-        save_numpy_as_csv(df_cb[TSV_HEADERS].to_numpy(), f'{tsv_base_name}-meta.tsv', TSV_HEADERS)
+        save_numpy_as_csv(df_cb[df_headers].to_numpy(), f'{tsv_base_name}-meta.tsv', df_headers)
 
     # plot the correlation matrix
     if plot_corr_matrix:
