@@ -18,6 +18,7 @@ from numpy import random
 from analyze import normalize_crunchbase_df, COL_NAME
 
 COL_CB_PAGE = 'Organization Name URL'
+COL_LOGO_FILE = 'Logo File'
 
 REQ_HEADERS = {
     'accept-language': 'en-US,en;q=0.9',
@@ -32,19 +33,33 @@ EXT_JPG = '.jpeg'
 
 def download_html(url):
     res = requests.get(url, headers=REQ_HEADERS)
-    if res.status_code == 200:
-        return res.content.decode()
-    raise Exception(f'Error fetching HTML: {url}', res.status_code, res.text)
+    if res.status_code != 200:
+        raise Exception(f'Error fetching HTML: {url}', res.status_code, res.text)
+    return res.content.decode()
 
 
-def download_image(url, file_name):
+def download_image_to_file(url, file_name, auto_ext=False):
     res = requests.get(url, stream=True)
-    if res.status_code == 200:
-        res.raw.decode_content = True
-        with open(file_name, 'wb') as f:
-            shutil.copyfileobj(res.raw, f)
-        return
-    raise Exception(f'Error fetching Image to file: {url}', res.status_code, res.text)
+    if res.status_code != 200:
+        raise Exception(f'Error fetching Image to file: {url}', res.status_code, res.text)
+    # save to file
+    res.raw.decode_content = True
+    with open(file_name, 'wb') as f:
+        shutil.copyfileobj(res.raw, f)
+    # automatic extension for the image, based on mime
+    if auto_ext:
+        if '.' in file_name:
+            raise Exception(f'Requested automatic image extension, but the file name ({file_name}) already has one')
+        mime = magic.from_file(file_name, mime=True)
+        if mime != 'image/jpeg':
+            os.rename(file_name, file_name + EXT_JPG)
+            file_name += EXT_JPG
+        elif mime != 'image/png':
+            os.rename(file_name, file_name + EXT_PNG)
+            file_name += EXT_PNG
+        else:
+            raise Exception(f'unsupported image format: {mime}, for {file_name}')
+    return file_name
 
 
 def parse_og_image_in_html(html_text):
@@ -60,7 +75,7 @@ def parse_og_image_in_html(html_text):
             # only use 'og:image' and ignore everything else
             meta_property = meta_attrs['property']
             if meta_property == 'og:image':
-                return meta_attrs['content']
+                return meta_attrs['content'] or None
         else:
             raise Exception(f'<meta> of unknown kind (exp: name or property)', meta_attrs)
     raise Exception(f'<meta> og:image not found')
@@ -85,40 +100,42 @@ def run_app(csv_file, out_folder=''):
     # ready cloudinary api for crunchbase download
     cloudinary.config(cloud_name="crunchbase-production")
 
-    # process each line
+    # process all organizations
     for index, org_row in df_cb.iterrows():
         org_name = org_row[COL_NAME]
-        # org_description = org_row[COL_DESCRIPTION]
         org_url = org_row[COL_CB_PAGE]
 
-        # logo file name
-        org_logo_file_name = re.sub("[^0-9a-zA-Z]+", "-", org_name.lower())
-        org_logo_file_path = os.path.join(out_folder, org_logo_file_name)
-        if os.path.isfile(org_logo_file_path + EXT_PNG) or os.path.isfile(org_logo_file_path + EXT_JPG):
-            print(f' - skipping: {org_logo_file_path}')
-            continue
-
-        # load the CB organization URL to find more info from the META of the HTML
-        org_page_html = download_html(org_url)
-        cloudinary_image_url = parse_og_image_in_html(org_page_html)  # example: 'https://res.cloudinary.com/crunchbase-production/image/upload/c_lpad,h_256,w_256,f_auto,q_auto:eco,dpr_1/pwzuoya5pdebfii6bfbg'
-        cloudinary_image_suffix = cloudinary_image_url.split('/')[-1]  # example: pwzuoya5pdebfii6bfbg
-
-        # download the image, original, without transformations (highest possible quality)
-        cloudinary_image_orig_url = cloudinary.CloudinaryImage(cloudinary_image_suffix).build_url(transformations=[])  # example: 'http://res.cloudinary.com/crunchbase-production/image/upload/pwzuoya5pdebfii6bfbg'
-        download_image(cloudinary_image_orig_url, org_logo_file_path)
-        org_logo_mime = magic.from_file(org_logo_file_path, mime=True)
-        if org_logo_mime != 'image/jpeg':
-            os.rename(org_logo_file_path, org_logo_file_path + EXT_JPG)
-        elif org_logo_mime != 'image/png':
-            os.rename(org_logo_file_path, org_logo_file_path + EXT_PNG)
+        # download the org logo if missing
+        logo_file = os.path.join(out_folder, re.sub("[^0-9a-zA-Z]+", "-", org_name.lower()))
+        if os.path.isfile(logo_file + EXT_PNG):
+            logo_file += EXT_PNG
+            print(f' - [{index + 1:4}/{df_cb.shape[0]}] existing: {logo_file}')
+        elif os.path.isfile(logo_file + EXT_JPG):
+            logo_file += EXT_JPG
+            print(f' - [{index + 1:4}/{df_cb.shape[0]}] existing: {logo_file}')
         else:
-            raise Exception(f'unsupported image format: {org_logo_mime}, for {org_logo_file_path}')
+            # download the CB organization HTML page, to find more info from the META tag
+            org_page_html = download_html(org_url)
+            cloudinary_image_url = parse_og_image_in_html(org_page_html)  # example: 'https://res.cloudinary.com/crunchbase-production/image/upload/c_lpad,h_256,w_256,f_auto,q_auto:eco,dpr_1/pwzuoya5pdebfii6bfbg'
 
-        # done
-        print(f' + [{index + 1}/{df_cb.shape[0]}] downloaded: {org_logo_file_path}, of type', org_logo_mime)
+            # download the image, original, without transformations (highest possible quality)
+            if cloudinary_image_url is not None:
+                cloudinary_image_suffix = cloudinary_image_url.split('/')[-1]  # example: pwzuoya5pdebfii6bfbg
+                cloudinary_image_orig_url = cloudinary.CloudinaryImage(cloudinary_image_suffix).build_url(transformations=[])  # example: 'http://res.cloudinary.com/crunchbase-production/image/upload/pwzuoya5pdebfii6bfbg'
+                logo_file = download_image_to_file(cloudinary_image_orig_url, logo_file, True)
+                print(f' + [{index + 1:4}/{df_cb.shape[0]}] downloaded: {logo_file}')
+            else:
+                logo_file = None
+                print(f' + [{index + 1:4}/{df_cb.shape[0]}] missing logo for {org_name}')
 
-        # do not overload the server with requests
-        time.sleep(random.uniform(5, 10) + random.uniform(1, 10))
+            # do not overload the server with requests
+            time.sleep(random.uniform(5, 10) + random.uniform(1, 10))
+
+        # the logo file can be None
+        org_row[COL_LOGO_FILE] = logo_file
+
+    # finished the loop
+    print('check the table for None(S)')
 
 
 if __name__ == '__main__':

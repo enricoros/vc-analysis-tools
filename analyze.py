@@ -68,7 +68,7 @@ def normalize_crunchbase_df(df):
 
     df[COL_TITLE] = df.apply(lambda row: row[COL_NAME] + ((' (' + str(round(row[COL_MONEY] / 1E+06)) + ' M)') if np.isfinite(row[COL_MONEY]) else ''), axis=1)
     df[COL_FUND_YEAR] = df.apply(lambda row: row[COL_FUND_DATE][:4] if row[COL_FUND_DATE] != 'Unknown' and row[COL_FUND_DATE] == row[COL_FUND_DATE] else '', axis=1)
-    if COL_WEBSITE in df:
+    if COL_WEBSITE in df and COL_WEBSITE not in TSV_HEADERS:
         TSV_HEADERS.append(COL_WEBSITE)
     return df[TSV_HEADERS]
 
