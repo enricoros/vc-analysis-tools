@@ -3,15 +3,16 @@ import pandas as pd
 import tensorflow_hub as hub
 
 # uniform arrangement of the data frame
-COL_TITLE = 'Title'
 COL_NAME = 'Name'
+COL_TITLE = 'Title'
 COL_SERIES = 'Series'
+COL_MONEY = 'Money'
 COL_FUND_DATE = 'Funds Date'
 COL_FUND_YEAR = 'Funds Year'
-COL_MONEY = 'Money'
-COL_INDUSTRIES = 'Industries'
+COL_LABEL = 'Label'
 COL_DESCRIPTION = 'Description'
-_TSV_HEADERS = [COL_NAME, COL_TITLE, COL_SERIES, COL_FUND_DATE, COL_FUND_YEAR, COL_MONEY, COL_DESCRIPTION, COL_INDUSTRIES]
+COL_INDUSTRIES = 'Industries'
+_TSV_HEADERS = [COL_NAME, COL_TITLE, COL_SERIES, COL_MONEY, COL_FUND_DATE, COL_FUND_YEAR, COL_LABEL, COL_DESCRIPTION, COL_INDUSTRIES]
 _TSV_OPTIONALS = ['Website']
 
 
@@ -68,6 +69,7 @@ def normalize_crunchbase_df(df):
 
     df[COL_TITLE] = df.apply(lambda row: row[COL_NAME] + ((' (' + str(round(row[COL_MONEY] / 1E+06)) + ' M)') if np.isfinite(row[COL_MONEY]) else ''), axis=1)
     df[COL_FUND_YEAR] = df.apply(lambda row: row[COL_FUND_DATE][:4] if row[COL_FUND_DATE] != 'Unknown' and row[COL_FUND_DATE] == row[COL_FUND_DATE] else '', axis=1)
+    df[COL_LABEL] = 0
 
     # add optional columns, if present in the dataset
     headers = _TSV_HEADERS.copy()
