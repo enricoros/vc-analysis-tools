@@ -4,17 +4,18 @@ Enrico 2021
 import os
 import re
 import shutil
-import magic
+import time
 from pathlib import Path
 
+import cloudinary
 import fire as fire
+import magic
 import pandas as pd
 import requests
-import time
-from numpy import random
-from analyze import normalize_crunchbase_df, COL_NAME, COL_DESCRIPTION
 from bs4 import BeautifulSoup
-import cloudinary
+from numpy import random
+
+from analyze import normalize_crunchbase_df, COL_NAME
 
 COL_CB_PAGE = 'Organization Name URL'
 
@@ -27,10 +28,6 @@ REQ_HEADERS = {
 
 EXT_PNG = '.png'
 EXT_JPG = '.jpeg'
-
-
-def sleep_well():
-    time.sleep(random.uniform(5, 10) + random.uniform(1, 10))
 
 
 def download_html(url):
@@ -91,7 +88,7 @@ def run_app(csv_file, out_folder=''):
     # process each line
     for index, org_row in df_cb.iterrows():
         org_name = org_row[COL_NAME]
-        org_description = org_row[COL_DESCRIPTION]
+        # org_description = org_row[COL_DESCRIPTION]
         org_url = org_row[COL_CB_PAGE]
 
         # logo file name
@@ -121,7 +118,7 @@ def run_app(csv_file, out_folder=''):
         print(f' + [{index + 1}/{df_cb.shape[0]}] downloaded: {org_logo_file_path}, of type', org_logo_mime)
 
         # do not overload the server with requests
-        sleep_well()
+        time.sleep(random.uniform(5, 10) + random.uniform(1, 10))
 
 
 if __name__ == '__main__':
