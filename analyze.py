@@ -63,6 +63,18 @@ def normalize_crunchbase_df(df):
         }, inplace=True)
         df[COL_MONEY] = 0
 
+    # type heuristics: Company List (BARE MINIMUM)
+    elif "Organization Name" in df and "Industries" in df and "Description" in df:
+        print(' * detected a BARE MINIMUM Company List CSV')
+        df.rename(columns={
+            "Organization Name": COL_NAME,
+            "Industries": COL_INDUSTRIES,
+            "Description": COL_DESCRIPTION,
+        }, inplace=True)
+        df[COL_SERIES] = 'Unknown'
+        df[COL_FUND_DATE] = 'Unknown'
+        df[COL_MONEY] = 0
+
     # type heuristics: ?
     else:
         raise Exception('Wrong CSV file type')
