@@ -27,9 +27,12 @@ REQ_HEADERS = {
     'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
 }
 
-EXT_PNG = '.png'
-EXT_JPG = '.jpeg'
-
+IMG_EXT_MAP = {
+    'image/jpeg': '.jpeg',
+    'image/png': '.png',
+    'image/webp': '.webp',
+    'image/gif': '.gif',
+}
 
 def download_html(url):
     res = requests.get(url, headers=REQ_HEADERS)
@@ -51,12 +54,10 @@ def download_image_to_file(url, file_name, auto_ext=False):
         if '.' in file_name:
             raise Exception(f'Requested automatic image extension, but the file name ({file_name}) already has one')
         mime = magic.from_file(file_name, mime=True)
-        if mime == 'image/jpeg':
-            os.rename(file_name, file_name + EXT_JPG)
-            file_name += EXT_JPG
-        elif mime == 'image/png':
-            os.rename(file_name, file_name + EXT_PNG)
-            file_name += EXT_PNG
+        if mime in IMG_EXT_MAP:
+            ext = IMG_EXT_MAP[mime]
+            os.rename(file_name, file_name + ext)
+            file_name += ext
         else:
             raise Exception(f'unsupported image format: {mime}, for {file_name}')
     return file_name
@@ -105,15 +106,18 @@ def run_app(csv_file, out_folder=''):
         org_name = org_row[COL_NAME]
         org_url = org_row[COL_CB_PAGE]
 
-        # download the org logo if missing
+        # check if the logo is present (by probing all known extensions)
         logo_file = os.path.join(out_folder, re.sub("[^0-9a-zA-Z]+", "-", org_name.lower()))
-        if os.path.isfile(logo_file + EXT_PNG):
-            logo_file += EXT_PNG
-            print(f' - [{index + 1:4}/{df_cb.shape[0]}] existing: {logo_file}')
-        elif os.path.isfile(logo_file + EXT_JPG):
-            logo_file += EXT_JPG
-            print(f' - [{index + 1:4}/{df_cb.shape[0]}] existing: {logo_file}')
-        else:
+        exists = False
+        for mime, ext in IMG_EXT_MAP.items():
+            if os.path.isfile(logo_file + ext):
+                logo_file += ext
+                print(f' - [{index + 1:4}/{df_cb.shape[0]}] existing: {logo_file}')
+                exists = True
+                break
+
+        # download the org logo if missing
+        if not exists:
             # download the CB organization HTML page, to find more info from the META tag
             org_page_html = download_html(org_url)
             cloudinary_image_url = parse_og_image_in_html(org_page_html)  # example: 'https://res.cloudinary.com/crunchbase-production/image/upload/c_lpad,h_256,w_256,f_auto,q_auto:eco,dpr_1/pwzuoya5pdebfii6bfbg'
