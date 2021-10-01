@@ -51,10 +51,10 @@ def download_image_to_file(url, file_name, auto_ext=False):
         if '.' in file_name:
             raise Exception(f'Requested automatic image extension, but the file name ({file_name}) already has one')
         mime = magic.from_file(file_name, mime=True)
-        if mime != 'image/jpeg':
+        if mime == 'image/jpeg':
             os.rename(file_name, file_name + EXT_JPG)
             file_name += EXT_JPG
-        elif mime != 'image/png':
+        elif mime == 'image/png':
             os.rename(file_name, file_name + EXT_PNG)
             file_name += EXT_PNG
         else:
