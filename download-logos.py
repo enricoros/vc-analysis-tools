@@ -15,7 +15,7 @@ import requests
 from bs4 import BeautifulSoup
 from numpy import random
 
-from analyze import normalize_crunchbase_df, COL_NAME
+from utils_crunchy import normalize_crunchbase_df, COL_NAME
 
 COL_CB_PAGE = 'Organization Name URL'
 COL_LOGO_FILE = 'Logo File'

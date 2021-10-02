@@ -1,121 +1,12 @@
 import numpy as np
 import pandas as pd
-import tensorflow_hub as hub
 
-# uniform arrangement of the data frame
-COL_NAME = 'Name'
-COL_TITLE = 'Title'
-COL_SERIES = 'Series'
-COL_MONEY = 'Money'
-COL_FUND_DATE = 'Funds Date'
-COL_FUND_YEAR = 'Funds Year'
-COL_LABEL = 'Label'
-COL_DESCRIPTION = 'Description'
-COL_INDUSTRIES = 'Industries'
-_TSV_HEADERS = [COL_NAME, COL_TITLE, COL_SERIES, COL_MONEY, COL_FUND_DATE, COL_FUND_YEAR, COL_LABEL, COL_DESCRIPTION, COL_INDUSTRIES]
-_TSV_OPTIONALS = ['Website']
-
-
-# data loader: df[ Title, Name, Series, Money, Industries, Description ]
-def normalize_crunchbase_df(df):
-    # type heuristics: Funding Rounds
-    if "Money Raised Currency (in USD)" in df and "Organization Industries" in df:
-        print(' * detected a Funding Rounds CSV')
-        df.rename(columns={
-            "Organization Name": COL_NAME,
-            "Funding Type": COL_SERIES,
-            "Announced Date": COL_FUND_DATE,
-            "Money Raised Currency (in USD)": COL_MONEY,
-            "Organization Industries": COL_INDUSTRIES,
-            "Organization Description": COL_DESCRIPTION,
-        }, inplace=True)
-
-    # type heuristics: Company List
-    elif "Total Funding Amount Currency (in USD)" in df:
-        print(' * detected a Company List CSV')
-        df.rename(columns={
-            "Organization Name": COL_NAME,
-            # Series
-            # Funding Date
-            "Total Funding Amount Currency (in USD)": COL_MONEY,
-            "Industries": COL_INDUSTRIES,
-            "Description": COL_DESCRIPTION,
-        }, inplace=True)
-        if 'Last Funding Type' in df:
-            df.rename(columns={"Last Funding Type": COL_SERIES}, inplace=True)
-        else:
-            df[COL_SERIES] = 'Unknown'
-        if 'Last Funding Date' in df:
-            df.rename(columns={"Last Funding Date": COL_FUND_DATE}, inplace=True)
-        else:
-            df[COL_FUND_DATE] = 'Unknown'
-
-    # type heuristics: Company Search
-    elif "Last Funding Type" in df:
-        print(' * detected a Company Search CSV')
-        df.rename(columns={
-            "Organization Name": COL_NAME,
-            "Last Funding Type": COL_SERIES,
-            "Last Funding Date": COL_FUND_DATE,
-            # Money
-            "Industries": COL_INDUSTRIES,
-            "Description": COL_DESCRIPTION,
-        }, inplace=True)
-        df[COL_MONEY] = 0
-
-    # type heuristics: Company List (BARE MINIMUM)
-    elif "Organization Name" in df and "Industries" in df and "Description" in df:
-        print(' * detected a BARE MINIMUM Company List CSV')
-        df.rename(columns={
-            "Organization Name": COL_NAME,
-            "Industries": COL_INDUSTRIES,
-            "Description": COL_DESCRIPTION,
-        }, inplace=True)
-        df[COL_SERIES] = 'Unknown'
-        df[COL_FUND_DATE] = 'Unknown'
-        df[COL_MONEY] = 0
-
-    # type heuristics: ?
-    else:
-        raise Exception('Wrong CSV file type')
-
-    df[COL_TITLE] = df.apply(lambda row: row[COL_NAME] + ((' (' + str(round(row[COL_MONEY] / 1E+06)) + ' M)') if np.isfinite(row[COL_MONEY]) else ''), axis=1)
-    df[COL_FUND_YEAR] = df.apply(lambda row: row[COL_FUND_DATE][:4] if row[COL_FUND_DATE] != 'Unknown' and row[COL_FUND_DATE] == row[COL_FUND_DATE] else '', axis=1)
-    df[COL_LABEL] = '_'
-
-    # add optional columns, if present in the dataset
-    headers = _TSV_HEADERS.copy()
-    for col in _TSV_OPTIONALS:
-        if col in df and col not in headers:
-            headers.append(col)
-    return df[headers], headers
-
-
-# sentence similarity, using USE from TF-Hub (instead of Sentence-Transformers, for instance)
-_model_use = None
-_model_use_large = None
-
-
-def text_to_embeds_use_fast(text_list):
-    global _model_use
-    if _model_use is None:
-        _model_use = hub.load("https://tfhub.dev/google/universal-sentence-encoder/4")
-    text_embeddings = _model_use(text_list)
-    correlation = np.inner(text_embeddings, text_embeddings)
-    return 'use_fast', text_embeddings.numpy(), correlation
-
-
-def text_to_embeds_use(text_list):
-    global _model_use_large
-    if _model_use_large is None:
-        _model_use_large = hub.load("https://tfhub.dev/google/universal-sentence-encoder-large/5")
-    text_embeddings = _model_use_large(text_list)
-    correlation = np.inner(text_embeddings, text_embeddings)
-    return 'use', text_embeddings.numpy(), correlation
+from utils_crunchy import normalize_crunchbase_df, COL_TITLE, COL_MONEY, COL_INDUSTRIES
+from utils_embeddings import text_to_embeds_use
 
 
 # analysis from correlations matrices: group (sort rows, cols)
-def plot_correlation_sorted_df(df, corr_matrix, df_labels_header, chart_title):
+def _plot_correlation_sorted_df(df, corr_matrix, df_labels_header, chart_title):
     def sort_df_by_correlation(_df, _corr_matrix):
         curr_i = 0
         sorted_i = [curr_i]
@@ -152,7 +43,7 @@ def plot_correlation_sorted_df(df, corr_matrix, df_labels_header, chart_title):
 
 
 # Plot a Network Graph using the correlation matrix as edge weights, and the investment size as node weights
-def save_network_graph(df, corr_matrix, graph_title, graph_file_name, layout_algo='lgl', corr_threshold=0.5):
+def _save_network_graph(df, corr_matrix, graph_title, graph_file_name, layout_algo='lgl', corr_threshold=0.5):
     import igraph as ig
     import matplotlib.pyplot as plt
     import networkx as nx
@@ -271,7 +162,7 @@ def analyze_csv(investor_name, file_name, nlp_column, export_tsv=True, export_ne
         import matplotlib.pyplot as plt
         print(f' - Plotting {nlp_column} correlation matrix...')
         plt.figure()
-        plot_correlation_sorted_df(df_cb, companies_corr, COL_TITLE, f'{investor_name} rounds 21.H1 - by startup {nlp_column} similarity')
+        _plot_correlation_sorted_df(df_cb, companies_corr, COL_TITLE, f'{investor_name} rounds 21.H1 - by startup {nlp_column} similarity')
         # plt.savefig('test.png')
         plt.show(block=True)
 
@@ -281,7 +172,7 @@ def analyze_csv(investor_name, file_name, nlp_column, export_tsv=True, export_ne
         rounds_sum = round(np.sum(df_cb[COL_MONEY]) / 1E+08) / 10
         graph_title = f'{investor_name} - sum of series: {rounds_sum}B'  # Jan 1 to Jun 14, 2021 -
         png_file_name = f'graph-{investor_name}.png'
-        save_network_graph(df_cb, companies_corr, graph_title, png_file_name, 'lgl', 0.2 if 'coatue' in file_name else 0.3)
+        _save_network_graph(df_cb, companies_corr, graph_title, png_file_name, 'lgl', 0.2 if 'coatue' in file_name else 0.3)
 
 
 # basically tests the process

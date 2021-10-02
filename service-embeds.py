@@ -12,11 +12,12 @@ import pandas as pd
 from flask import Flask, render_template, request, send_file
 from flask_cors import cross_origin
 
-from analyze import normalize_crunchbase_df, text_to_embeds_use_fast, text_to_embeds_use, COL_INDUSTRIES, COL_DESCRIPTION
+from utils_crunchy import normalize_crunchbase_df, COL_INDUSTRIES, COL_DESCRIPTION
+from utils_embeddings import text_to_embeds_use, text_to_embeds_use_fast
 
 # configuration
 default_http_address = '127.0.0.1'
-default_http_port = 1900
+default_http_port = 8000
 default_api_prefix = '/embeds'
 
 page_upload_html_resp = '/upload_csv'
@@ -119,7 +120,7 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
 
     @app.route(api_prefix + '/index.html', methods=['GET'])
     def upload_file():
-        return render_template('analysis_service_upload.html', api_prefix=api_prefix)
+        return render_template('embeds_simple_frontend.html', api_prefix=api_prefix)
 
     @app.route(api_prefix + page_upload_html_resp, methods=['POST'])
     @cross_origin()
