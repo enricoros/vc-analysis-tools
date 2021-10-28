@@ -1,7 +1,7 @@
 import fire as fire
 import pandas as pd
 
-from utils_crunchy import normalize_crunchbase_df
+from utils_crunchy import normalize_crunchbase_df, COL_FUND_YEAR
 
 CB_ANN_DATE = 'Announced Date'
 CB_ORG_UID = 'Organization Name URL'
@@ -30,6 +30,7 @@ def main(cb_csv, check_lead='Tiger Global Management', out=None):
     if check_lead is not None:
         add_lead_col(df, check_lead)
     df, df_out_headers = normalize_crunchbase_df(df)
+    df = df[df[COL_FUND_YEAR].apply(lambda x: '202' in x)]
 
     # Save to file
     if out is None:
