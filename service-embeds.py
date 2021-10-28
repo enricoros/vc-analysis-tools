@@ -22,9 +22,11 @@ default_api_prefix = '/embeds'
 
 page_upload_html_resp = '/upload_csv'
 page_download = '/download'
+page_last_results = '/last_results'
 
 # In-Mem-Downloads - FIXME: have some purge strategy, this is just a mega-leaker
-hack_in_mem_downloads = {}
+in_mem_downloads = {}
+in_mem_results = []
 
 
 # Flash main app
@@ -128,7 +130,7 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
     @app.route(api_prefix + page_upload_html_resp, methods=['POST'])
     @cross_origin()
     def analyze_csv():
-        global hack_in_mem_downloads
+        global in_mem_downloads, in_mem_results
         try:
             file_base_name, analysis_title_name, companies_embeds, companies_meta, meta_headers, nlp_field = process_uploaded_file()
 
@@ -151,6 +153,11 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
                 ]
             }
 
+            # API response JSON
+            result = {'embeds': {'name': embeds_uid, 'length': len(embeds_tsv), 'shape': companies_embeds.shape, 'nlp_field': nlp_field},
+                      'meta': {'name': meta_uid, 'length': len(meta_tsv), 'shape': companies_meta.shape, 'fields': meta_headers},
+                      'config': {'name': config_uid}}
+
             # NOTE: this replaces the full contents, so former generations will not be accessible
             # HACK: shall cache-purge, but we're keeping just the last item, instead
             # hack_in_mem_downloads = {
@@ -159,26 +166,26 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
             #     config_uid: json.dumps(config_obj)
             # }
             # NOTE: keep in-memory - FIXME: needs some eviction policy/algo
-            hack_in_mem_downloads[embeds_uid] = embeds_tsv
-            hack_in_mem_downloads[meta_uid] = meta_tsv
-            hack_in_mem_downloads[config_uid] = json.dumps(config_obj)
-
-            return {'embeds': {'name': embeds_uid, 'length': len(embeds_tsv), 'shape': companies_embeds.shape, 'nlp_field': nlp_field},
-                    'meta': {'name': meta_uid, 'length': len(meta_tsv), 'shape': companies_meta.shape, 'fields': meta_headers},
-                    'config': {'name': config_uid}}, 200
-
-            # return f"""<html>
-            # <body>
-            #   <div>Outputs - "save as..." the following:
-            #   <ul>
-            #     <li><a href="{api_prefix}/download/{embeds_uid}">{embeds_uid}</a> ({len(embeds_tsv)} bytes)</li>
-            #     <li><a href="{api_prefix}/download/{meta_uid}">{meta_uid}</a> ({len(meta_tsv)} bytes)</li>
-            #   </ul>
-            # </body>
-            # </html>""", 200
+            in_mem_downloads[embeds_uid] = embeds_tsv
+            in_mem_downloads[meta_uid] = meta_tsv
+            in_mem_downloads[config_uid] = json.dumps(config_obj)
+            in_mem_results.append(result)
+            return result, 200
 
         except Exception as e:
-            print("EXCEPTION on analyze_csv")
+            print("EXCEPTION on " + page_upload_html_resp)
+            traceback.print_exc()
+            return {"backend_exception": repr(e)}, 500
+
+    @app.route(api_prefix + page_last_results, methods=['GET'])
+    @cross_origin()
+    def get_last_results():
+        try:
+            global in_mem_results
+            return in_mem_results, 200
+
+        except Exception as e:
+            print("EXCEPTION on " + page_last_results)
             traceback.print_exc()
             return {"backend_exception": repr(e)}, 500
 
@@ -186,10 +193,10 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
     @cross_origin()
     def download_from_cache(name):
         try:
-            if name not in hack_in_mem_downloads:
+            if name not in in_mem_downloads:
                 raise Exception('File Unknown')
             print(f'...serving {name}')
-            contents = hack_in_mem_downloads[name]
+            contents = in_mem_downloads[name]
 
             # send contents as file (requires temp stream)
             buffer = BytesIO()
@@ -198,7 +205,7 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
             return send_file(buffer, as_attachment=True, download_name=name, mimetype='text/csv')
 
         except Exception as e:
-            print("EXCEPTION on download")
+            print("EXCEPTION on " + page_download)
             traceback.print_exc()
             return {"backend_exception": repr(e)}, 500
 
