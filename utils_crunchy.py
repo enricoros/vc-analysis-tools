@@ -31,6 +31,8 @@ def normalize_crunchbase_df(df):
             "Organization Industries": COL_INDUSTRIES,
             "Organization Description": COL_DESCRIPTION,
         }, inplace=True)
+        if COL_MONEY in df:
+            df[COL_MONEY] = df[COL_MONEY] / 1E+06
 
     # type heuristics: Company List
     elif "Total Funding Amount Currency (in USD)" in df:
@@ -51,6 +53,8 @@ def normalize_crunchbase_df(df):
             df.rename(columns={"Last Funding Date": COL_FUND_DATE}, inplace=True)
         else:
             df[COL_FUND_DATE] = 'Unknown'
+        if COL_MONEY in df:
+            df[COL_MONEY] = df[COL_MONEY] / 1E+06
 
     # type heuristics: Company Search
     elif "Last Funding Type" in df:
@@ -80,9 +84,6 @@ def normalize_crunchbase_df(df):
     # type heuristics: ?
     else:
         raise Exception('Wrong CSV file type')
-
-    if COL_MONEY in df:
-        df[COL_MONEY] = df[COL_MONEY] / 1E+06
 
     if COL_TITLE not in df:
         df[COL_TITLE] = df.apply(lambda row: row[COL_NAME] + ((' (' + str(round(row[COL_MONEY])) + ' M)') if np.isfinite(row[COL_MONEY]) else ''), axis=1)
