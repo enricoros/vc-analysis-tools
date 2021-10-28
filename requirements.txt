@@ -5,6 +5,7 @@ pandas==1.2.4           # CSV load
 pycairo~=1.20.1         # network graphs: render PNGs
 python-igraph~=0.9.4    # network graphs (2/2: best layout/plot)
 seaborn==0.11.1         # heatmap
+sentence-transformers==2.1.0
 tensorflow-cpu~=2.5.0
 tensorflow-hub~=0.12.0
 tensorflow-text

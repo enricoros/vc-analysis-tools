@@ -6,6 +6,7 @@ flask-cors~=3.0.10
 # for the analysis
 numpy
 pandas==1.2.4
+sentence-transformers==2.1.0
 tensorflow-cpu~=2.5.0
 tensorflow-hub~=0.12.0
 

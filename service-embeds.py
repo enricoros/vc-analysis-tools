@@ -13,7 +13,7 @@ from flask import Flask, render_template, request, send_file
 from flask_cors import cross_origin
 
 from utils_crunchy import normalize_crunchbase_df, COL_INDUSTRIES, COL_DESCRIPTION
-from utils_embeddings import text_to_embeds_use, text_to_embeds_use_fast
+from utils_embeddings import text_to_embeds_use, text_to_embeds_use_fast, text_to_embeds_mpnet
 
 # configuration
 default_http_address = '127.0.0.1'
@@ -35,8 +35,9 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
     app.logger.setLevel(20)
     print()
 
-    # warm up the predictor
+    # warm up the predictors
     text_to_embeds_use(['House', 'Home', 'Cat'])
+    text_to_embeds_mpnet(['House', 'Home', 'Cat'])
 
     # load the file received as attachment, produce the embeds, prepare the 2 data arrays
     def process_uploaded_file():
@@ -83,6 +84,8 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
                 model_fun = text_to_embeds_use
             elif model_form == 1:
                 model_fun = text_to_embeds_use_fast
+            elif model_form == 2:
+                model_fun = text_to_embeds_mpnet
             else:
                 print(f'EE: model requested ({model_form}) is not supported. Fallback to using: {model_fun}')
 
