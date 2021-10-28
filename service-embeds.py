@@ -182,7 +182,7 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
     def get_last_results():
         try:
             global in_mem_results
-            return in_mem_results, 200
+            return {'results': in_mem_results}, 200
 
         except Exception as e:
             print("EXCEPTION on " + page_last_results)
