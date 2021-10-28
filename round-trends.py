@@ -4,36 +4,40 @@ import pandas as pd
 from utils_crunchy import normalize_crunchbase_df
 
 CB_ANN_DATE = 'Announced Date'
-CB_LEAD_INV = 'Lead Investors'
 CB_ORG_UID = 'Organization Name URL'
+CB_LEAD_INV = 'Lead Investors'
 ADD_LEAD_COL = 'Lead'
 
 
-def first_investment_rounds(cb_csv, check_lead='Tiger Global Management', out=None):
+def remove_follow_ons(df_orig):
+    df_date_desc = df_orig.sort_values(by=CB_ANN_DATE, ascending=False)
+    df_no_follow_ons = df_date_desc.drop_duplicates(subset=CB_ORG_UID, keep='last')
+    print(f'\nOriginal: {len(df_orig)} rows, date-descending {len(df_date_desc)}, unique {len(df_no_follow_ons)}')
+    return df_no_follow_ons.copy()
+
+
+def add_lead_col(df, check_lead):
+    df[ADD_LEAD_COL] = df.apply(lambda row: '?' if pd.isna(row[CB_LEAD_INV]) else '1' if check_lead in row[CB_LEAD_INV] else '0', axis=1)
+
+
+def main(cb_csv, check_lead='Tiger Global Management', out=None):
     if cb_csv is None:
         raise ValueError("Please provide a csv file")
 
-    # load file
+    # Load, remove follow-ons, add lead column
     print(f'\nLoading {cb_csv}...')
-
-    df_orig = pd.read_csv(cb_csv)
-    df_date_desc = df_orig.sort_values(by=CB_ANN_DATE, ascending=False)
-    df_unique_first_round = df_date_desc.drop_duplicates(subset=CB_ORG_UID, keep='last')
-    df_out = df_unique_first_round.copy()
+    df = remove_follow_ons(pd.read_csv(cb_csv))
     if check_lead is not None:
-        df_out[ADD_LEAD_COL] = df_out.apply(lambda row: '?' if pd.isna(row[CB_LEAD_INV]) else '1' if check_lead in row[CB_LEAD_INV] else '0', axis=1)
-    df_out, df_out_headers = normalize_crunchbase_df(df_out)
+        add_lead_col(df, check_lead)
+    df, df_out_headers = normalize_crunchbase_df(df)
 
-    # print the number of rows for the original and the filtered dataframes
-    print(f'\nOriginal: {len(df_orig)} rows, date-descending {len(df_date_desc)}, unique {len(df_unique_first_round)}, output {len(df_out)}')
-
-    # write the output file
-    if out is not None:
-        print(f'\nSaving to {out}...')
-        df_out.to_csv(out, index=False, columns=df_out_headers)
-    else:
+    # Save to file
+    if out is None:
         print(f'\nWARNING: output file not specified')
+        return
+    print(f'\nSaving to {out}...')
+    df.to_csv(out, index=False, columns=df_out_headers)
 
 
 if __name__ == '__main__':
-    fire.Fire(first_investment_rounds)
+    fire.Fire(main)
