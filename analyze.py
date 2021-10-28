@@ -169,7 +169,7 @@ def analyze_csv(investor_name, file_name, nlp_column, export_tsv=True, export_ne
     # save a PNG file with the graph of rounds
     if export_network_png:
         print(' - Generating network graph of rounds, using the LGL algo')
-        rounds_sum = round(np.sum(df_cb[COL_MONEY]) / 1E+08) / 10
+        rounds_sum = round(np.sum(df_cb[COL_MONEY]) / 1E+02) / 10
         graph_title = f'{investor_name} - sum of series: {rounds_sum}B'  # Jan 1 to Jun 14, 2021 -
         png_file_name = f'graph-{investor_name}.png'
         _save_network_graph(df_cb, companies_corr, graph_title, png_file_name, 'lgl', 0.2 if 'coatue' in file_name else 0.3)
