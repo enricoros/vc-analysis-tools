@@ -1,25 +1,28 @@
-matplotlib~=3.4.2       # heatmap and graphs (palette)
-networkx~=2.5.1         # network graphs (1/2: easy build)
-numpy
-pandas==1.2.4           # CSV load
-pycairo~=1.20.1         # network graphs: render PNGs
-python-igraph~=0.9.4    # network graphs (2/2: best layout/plot)
-seaborn==0.11.1         # heatmap
-sentence-transformers==2.1.0
-tensorflow-cpu~=2.5.0
-tensorflow-hub~=0.12.0
-tensorflow-text
+# for serving the app
+fire~=0.4
+flask~=2.0
+flask-cors~=3.0
 
-# for the server part
-fire~=0.4.0
-flask~=2.0.1
-flask-cors~=3.0.10
+# for embeddings
+numpy~=1.21
+pandas~=1.3
+sentence-transformers~=2.1
+tensorflow-cpu~=2.7
+tensorflow-hub~=0.12
 
-# for the download-logos
-beautifulsoup4~=4.9.3
-cloudinary~=1.26.0
-python-magic-bin~=0.4.14
-requests~=2.26.0
+# for meta parsing
+requests~=2.26
+beautifulsoup4~=4.10
+metadata_parser~=0.10
 
-# for snippets
-#heatmapz~=0.0.4
+# for download-logos (requires requests and bs4 too)
+#cloudinary~=1.28
+#python-magic-bin~=0.4
+
+# disabled because they don't matter for the service (used in the cmdline frontend)
+#matplotlib~=3.4        # heatmap and graphs (palette)
+#networkx~=2.6          # network graphs (1/2: easy build)
+#pycairo~=1.20.1        # network graphs: render PNGs
+#python-igraph~=0.9     # network graphs (2/2: best layout/plot)
+#seaborn~=0.11          # heatmap
+#tensorflow-text~=2.7   # disabled because pulls in tensorflow (not tf-cpu) again
