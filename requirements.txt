@@ -23,6 +23,6 @@ metadata_parser~=0.10
 #matplotlib~=3.4        # heatmap and graphs (palette)
 #networkx~=2.6          # network graphs (1/2: easy build)
 #pycairo~=1.20.1        # network graphs: render PNGs
-#python-igraph~=0.9     # network graphs (2/2: best layout/plot)
+#python-igraph~=0.9     # network graphs (2/2: layout/plot)
 #seaborn~=0.11          # heatmap
 #tensorflow-text~=2.7   # disabled because pulls in tensorflow (not tf-cpu) again
