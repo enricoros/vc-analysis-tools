@@ -21,7 +21,8 @@ default_http_port = 8000
 default_api_prefix = '/embeds'
 
 page_home = '/index.html'
-page_analyze = '/upload_csv'
+page_analyze_csv = '/analyze_csv'
+page_analyze_json = '/analyze_json'
 page_download = '/download'
 page_recent = '/last_results'
 
@@ -117,9 +118,9 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
         # noinspection PyUnresolvedReferences
         return render_template('embeds_simple_frontend.html', api_prefix=api_prefix)
 
-    @app.route(api_prefix + page_analyze, methods=['POST'])
+    @app.route(api_prefix + page_analyze_csv, methods=['POST'])
     @cross_origin()
-    def analyze_uploaded_csv_to_memory():
+    def analyze_csv():
         global in_mem_downloads, in_mem_results
         try:
             # get the attached file
@@ -186,7 +187,7 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
             return result, 200
 
         except Exception as e:
-            print("EXCEPTION on " + page_analyze)
+            print("EXCEPTION on " + page_analyze_csv)
             traceback.print_exc()
             return {"backend_exception": repr(e)}, 500
 
