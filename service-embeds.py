@@ -43,6 +43,19 @@ def array_to_tsv_string(array, tsv_name, headers=None):
     return string.getvalue()
 
 
+# acquires the correct engine
+def model_num_to_engine(model_num):
+    if model_num == 0:
+        return text_to_embeds_use
+    elif model_num == 1:
+        return text_to_embeds_use_fast
+    elif model_num == 2:
+        return text_to_embeds_mpnet
+    else:
+        print(f'EE: model requested ({model_num}) is not supported. Fallback to using 0')
+    return text_to_embeds_use
+
+
 # load the file received as attachment, produce the embeds, prepare the 2 data arrays
 def process_uploaded_file(csv_contents, investor_name, col_num, model_num):
     # Normalized DataFrame from the CSV
@@ -70,15 +83,7 @@ def process_uploaded_file(csv_contents, investor_name, col_num, model_num):
         df_cb.dropna(subset=[col], inplace=True)
 
     # select the model (dynamic)
-    model_fun = text_to_embeds_use
-    if model_num == 0:
-        model_fun = text_to_embeds_use
-    elif model_num == 1:
-        model_fun = text_to_embeds_use_fast
-    elif model_num == 2:
-        model_fun = text_to_embeds_mpnet
-    else:
-        print(f'EE: model requested ({model_num}) is not supported. Fallback to using: {model_fun}')
+    model_fun = model_num_to_engine(model_num)
 
     # perform the NLP analysis, concatenating all the embeds in the provided columns
     model_name = None
@@ -188,6 +193,33 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
 
         except Exception as e:
             print("EXCEPTION on " + page_analyze_csv)
+            traceback.print_exc()
+            return {"backend_exception": repr(e)}, 500
+
+    @app.route(api_prefix + page_analyze_json, methods=['POST'])
+    @cross_origin()
+    def analyze_json():
+        try:
+            # get and parse the input { model_num: 1, strings: [...] }
+            json_data = request.json
+            model_num = json_data['model_num']
+            nlp_strings = json_data['strings']
+
+            # compute embeddings locally
+            model_fun = model_num_to_engine(model_num)
+            model_name, embeddings, _ = model_fun(nlp_strings)
+
+            # API response JSON
+            # NOTE: we are limiting the precision of the embeddings to 6 decimals (from 19)
+            result = {
+                'embeds': numpy.round(embeddings.astype(float), 6).tolist(),
+                'model_name': model_name,
+                'shape': list(embeddings.shape),
+            }
+            return result
+
+        except Exception as e:
+            print("EXCEPTION on " + page_analyze_json)
             traceback.print_exc()
             return {"backend_exception": repr(e)}, 500
 
