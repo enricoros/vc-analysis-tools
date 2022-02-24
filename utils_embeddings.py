@@ -1,5 +1,5 @@
 """
-Enrico 2021 - Utils to create embeddings from strings
+Enrico 2022 - Utils to create embeddings from strings
 """
 import numpy as np
 import tensorflow_hub as hub
