@@ -111,16 +111,20 @@ def process_uploaded_file(csv_contents, investor_name, col_num, model_num):
 
 
 # Flash main app
-def run_app(http_host=default_http_address, http_port=default_http_port, api_prefix=default_api_prefix):
+def run_app(http_host=default_http_address, http_port=default_http_port, api_prefix=default_api_prefix,
+            exit_after_warm=False):
+    # warm up the predictors
+    text_to_embeds_use_large(['House', 'Home', 'Cat'])
+    text_to_embeds_mpnet(['House', 'Home', 'Cat'])
+    if exit_after_warm is not False:
+        print('Warmed up successfully. Exiting.')
+        return
+
     # configure Flask for serving
     print(f'\n# Starting HTTP endpoint on {http_host}: {http_port}, api prefix: {api_prefix}')
     app = Flask(__name__)
     app.logger.setLevel(20)
     print()
-
-    # warm up the predictors
-    text_to_embeds_use_large(['House', 'Home', 'Cat'])
-    text_to_embeds_mpnet(['House', 'Home', 'Cat'])
 
     @app.route(api_prefix + page_home, methods=['GET'])
     def render_home():
