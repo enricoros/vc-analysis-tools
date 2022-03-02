@@ -13,7 +13,7 @@ from flask import Flask, render_template, request, send_file
 from flask_cors import cross_origin
 
 from utils_crunchy import normalize_crunchbase_df, COL_INDUSTRIES, COL_DESCRIPTION
-from utils_embeddings import text_to_embeds_use, text_to_embeds_use_fast, text_to_embeds_mpnet
+from utils_embeddings import text_to_embeds_use_large, text_to_embeds_use_fast, text_to_embeds_mpnet
 
 # configuration
 default_http_address = '127.0.0.1'
@@ -21,10 +21,18 @@ default_http_port = 8000
 default_api_prefix = '/embeds'
 
 page_home = '/index.html'
+page_list_models = '/list_models'
 page_analyze_csv = '/analyze_csv'
 page_analyze_json = '/analyze_json'
 page_download = '/download'
 page_recent = '/last_results'
+
+# Supported CPU models for embedding generation
+MODELS = [
+    {'num': 0, 'name': 'use-large-5', 'fun': text_to_embeds_use_large},
+    {'num': 1, 'name': 'use-fast-4', 'fun': text_to_embeds_use_fast},
+    {'num': 2, 'name': 'all-mpnet-base-v2', 'fun': text_to_embeds_mpnet},
+]
 
 # In-Mem-Downloads - FIXME: have some purge strategy, this is just a mega-leaker
 in_mem_downloads = {}
@@ -44,16 +52,12 @@ def array_to_tsv_string(array, tsv_name, headers=None):
 
 
 # acquires the correct engine
-def model_num_to_engine(model_num):
-    if model_num == 0:
-        return text_to_embeds_use
-    elif model_num == 1:
-        return text_to_embeds_use_fast
-    elif model_num == 2:
-        return text_to_embeds_mpnet
-    else:
-        print(f'EE: model requested ({model_num}) is not supported. Fallback to using 0')
-    return text_to_embeds_use
+def model_num_to_engine(model_num_or_name):
+    model = next((m for m in MODELS if (m['num'] == model_num_or_name or m['name'] == model_num_or_name)), None)
+    if model is None:
+        print(f'EE: model requested ({model_num_or_name}) is not supported. Fallback to using 0')
+        return text_to_embeds_use_large
+    return model['fun']
 
 
 # load the file received as attachment, produce the embeds, prepare the 2 data arrays
@@ -115,13 +119,46 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
     print()
 
     # warm up the predictors
-    text_to_embeds_use(['House', 'Home', 'Cat'])
+    text_to_embeds_use_large(['House', 'Home', 'Cat'])
     text_to_embeds_mpnet(['House', 'Home', 'Cat'])
 
     @app.route(api_prefix + page_home, methods=['GET'])
     def render_home():
         # noinspection PyUnresolvedReferences
         return render_template('embeds_simple_frontend.html', api_prefix=api_prefix)
+
+    @app.route(api_prefix + page_list_models, methods=['GET'])
+    @cross_origin()
+    def list_models():
+        return {"engines": [m['name'] for m in MODELS]}, 200
+
+    @app.route(api_prefix + page_analyze_json, methods=['POST'])
+    @cross_origin()
+    def analyze_json():
+        try:
+            # get and parse the input { model: 1, strings: [...] }
+            json_data = request.json
+            model_num = json_data['model']  # can be the number or the name (from /list_models)
+            nlp_strings = json_data['input']  # list of strings
+
+            # compute embeddings locally
+            model_fun = model_num_to_engine(model_num)
+            model_name, embeddings, _ = model_fun(nlp_strings)
+
+            # API response JSON
+            # NOTE: we are limiting the precision of the embeddings to 6 decimals (from 19)
+            result = {
+                'embeds': numpy.round(embeddings.astype(float), 9).tolist(),
+                'model_name': model_name,
+                'dimensions': embeddings.shape[1],
+                'shape': list(embeddings.shape),
+            }
+            return result
+
+        except Exception as e:
+            print("EXCEPTION on " + page_analyze_json)
+            traceback.print_exc()
+            return {"backend_exception": repr(e)}, 500
 
     @app.route(api_prefix + page_analyze_csv, methods=['POST'])
     @cross_origin()
@@ -193,33 +230,6 @@ def run_app(http_host=default_http_address, http_port=default_http_port, api_pre
 
         except Exception as e:
             print("EXCEPTION on " + page_analyze_csv)
-            traceback.print_exc()
-            return {"backend_exception": repr(e)}, 500
-
-    @app.route(api_prefix + page_analyze_json, methods=['POST'])
-    @cross_origin()
-    def analyze_json():
-        try:
-            # get and parse the input { model_num: 1, strings: [...] }
-            json_data = request.json
-            model_num = json_data['model_num']
-            nlp_strings = json_data['strings']
-
-            # compute embeddings locally
-            model_fun = model_num_to_engine(model_num)
-            model_name, embeddings, _ = model_fun(nlp_strings)
-
-            # API response JSON
-            # NOTE: we are limiting the precision of the embeddings to 6 decimals (from 19)
-            result = {
-                'embeds': numpy.round(embeddings.astype(float), 6).tolist(),
-                'model_name': model_name,
-                'shape': list(embeddings.shape),
-            }
-            return result
-
-        except Exception as e:
-            print("EXCEPTION on " + page_analyze_json)
             traceback.print_exc()
             return {"backend_exception": repr(e)}, 500
 

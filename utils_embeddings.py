@@ -22,7 +22,7 @@ def text_to_embeds_use_fast(text_list):
     return 'use_fast', text_embeddings.numpy(), correlation
 
 
-def text_to_embeds_use(text_list):
+def text_to_embeds_use_large(text_list):
     global _model_use_large
     if _model_use_large is None:
         _model_use_large = hub.load("https://tfhub.dev/google/universal-sentence-encoder-large/5")

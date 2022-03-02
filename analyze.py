@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 
 from utils_crunchy import normalize_crunchbase_df, COL_TITLE, COL_MONEY, COL_INDUSTRIES
-from utils_embeddings import text_to_embeds_use
+from utils_embeddings import text_to_embeds_use_large
 
 
 # analysis from correlations matrices: group (sort rows, cols)
@@ -148,7 +148,7 @@ def analyze_csv(investor_name, file_name, nlp_column, export_tsv=True, export_ne
     # compute sentence distance from the nlp column
     print(f" - NLP analysis and correlation matrix, based off '{nlp_column}'...")
     nlp_strings = list(df_cb[nlp_column])
-    model_name, companies_embeds, companies_corr = text_to_embeds_use(nlp_strings)
+    model_name, companies_embeds, companies_corr = text_to_embeds_use_large(nlp_strings)
     print('   single min:', np.max(np.min(companies_corr, axis=1)), ' max: ', np.max(companies_corr))
 
     # save raw embeds for usage (for instance with https://projector.tensorflow.org/)
